@@ -3,8 +3,7 @@ It uses INDI drivers and follows the INDI Protocol to control a mount and a CCD 
 
 ### The architecture of the INDI Protocol
 
-
-<img width="492" alt="INDIarchitecture" src="https://user-images.githubusercontent.com/105792791/218797218-626ab47b-a6e5-4d77-a010-176f20ef06e7.PNG">
+<img width="900" alt="INDIarchitecture" src="https://user-images.githubusercontent.com/105792791/218797218-626ab47b-a6e5-4d77-a010-176f20ef06e7.PNG">
 
 source: https://www.frontiersin.org/articles/10.3389/fspas.2022.895732/full
 
@@ -36,8 +35,8 @@ Here is how the program works.
   This code is using the open source software INDI to control the telescope orientation and camera trigger. So before anything else, an INDI server needs to be launched and an INDI client needs to be initialized: the server will run the commands, and the client will control the devices from the server.
 	
   To initialize the server, the command 'indiserver' has to be run in a terminal, followed by the initialization of the devices that we want to control. In this case, we are using a QHY CCD camera, and a SynScan telescope, so the full command to run is as follows:
-
-<img width="321" alt="indiserver" src="https://user-images.githubusercontent.com/105792791/218798620-d0aa7364-832d-4fce-aa2c-6f14f0c02865.PNG">
+  
+``` indiserver -v indi_qhy_ccd indi_synscan_telescope ```
 
   To initialize the client, we need to create a subclass to the original INDI class responsible for creating clients : BaseClient. The subclass (called IndiClient) inherits the properties and methods of BaseClient (e.g. newDevice() etc). None of the methods need to be overridden in theory, but overriding the newBLOB method enables the use of Python module threading, which will prove useful to be able to continue capturing new data while processing data that has just been captured. Once the client subclass has been created, we need to create an instance of IndiClient, and link it to the server. Once the client is connected to the server, the set up of the devices can begin.
 
@@ -45,12 +44,25 @@ Here is how the program works.
 	
   To be able to control the doings of the telescope and the camera, they first have to be recognized by the client. 
 
-<img width="275" alt="getdevice" src="https://user-images.githubusercontent.com/105792791/218798929-0570a5a7-c1e6-4616-842d-ec67edb5b326.PNG">
-
+``` 
+ccd = "QHY CCD QHY174M-7a6fbf4" 
+device_ccd = indiclient.getDevice(ccd)
+ccd_connect = device_ccd.getSwitch("CONNECTION")
+if not device_ccd.isConnected():
+    ccd_connect[0].s = PyIndi.ISS_ON      # this is the CONNECT switch
+    ccd_connect[1].s = PyIndi.ISS_OFF     # this is the DISCONNECT switch
+    indiclient.sendNewSwitch(ccd_connect)
+```
   Once they are, they have to be connected to the server, after which all properties will be controllable through the server with predefined commands. Here is how setting the properties works, illustrated by the example of the CCD's temperature property.
 
-<img width="475" alt="ccdtemp" src="https://user-images.githubusercontent.com/105792791/218799263-577c8c62-2f47-4e51-9c2d-a274d2ac32d5.PNG">
-
+``` 
+ccd_temperature = device_ccd.getNumber("CCD_TEMPERATURE")
+while not ccd_temperature:
+    time.sleep(0.5)
+    ccd_temperature = device_ccd.getNumber("CCD_TEMPERATURE")
+ccd_temperature[0].value = -10
+indiclient.sendNewNumber(ccd_temperature)
+``` 
   For every device, there is a defined list of properties, with specific types and names (most of them can be found under Standard Properties on the Indilib website. The CCD's temperature is a type Number property and its name is 'CCD_TEMPERATURE'. Other types include Text and Switch (ON/OFF). In order to change a property, it has to be accessed first with the getType(“NAME_OF_PROP”) method. For example the CCD's temperature is accessed by getNumber(“CCD_TEMPERATURE”).
 	
   Then, once the server was able to get the property, we can set its value, text, or position depending on whether the property type is Number, Text or Switch. Each property is represented as an array in Python (it can be an array of 1), so in order to set values for a property, it can simply be called with indexes. The CCD temperature property is a single value, so ccd_temperature[0].value = XX will set the CDD temperature to XX. Finally, for the new set value to be taken into account, the redefined array has to be sent to the device by the client, using the sendNewType method. For the CCD temperature property, it would be sendNewNumber(ccd_temp).

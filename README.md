@@ -1,5 +1,5 @@
 The purpose of this program is to schedule streaming of several stars through the night to automatically capture stellar occultations by asteroids. 
-It uses INDI drivers and follows the INDI Protocol to control a mount and a CCD camera from a RaspberryPi computer.
+It uses INDI drivers and follows the INDI Protocol to control a mount and a CCD camera from a RaspberryPi computer. Before executing the code, the RaspberryPi must be turned on, and physically connected to the camera and the mount. Also, INDI has to be installed on the RaspberryPi (it can be downloaded [here](https://indilib.org/get-indi.html?start=5)), as well as a few python modules like PyIndi, astropy.io, astroplan and astrometry.net.
 
 ### The architecture of the INDI Protocol
 

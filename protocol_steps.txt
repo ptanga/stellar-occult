@@ -1,0 +1,16 @@
+Steps of the protocol :
+  1. connect to the device (telescope) and the indiserver
+  2. send a getProperties which sends back a def* per property
+  /!\ it is important to keep in mind that not all def* messages are sent at the same time
+
+  3. before changing the value of a property, change its state to Busy
+  3(bis). send a new* to set a new value for a property
+  note : the property state should be back to OK after the task is done
+
+  example : to change a property named "PROPERTY_EXAMPLE" composed of numbers, one would
+  need first to initiate a new array with current values with the following command :
+  new_values = device.getNumber("PROPERTY_EXAMPLE")
+  then, the values of the new array are changed using indexes, and the array is sent back with :
+  indiclient.sendNewNumber(new_values)
+
+  4. the change in property values can be printed is needed

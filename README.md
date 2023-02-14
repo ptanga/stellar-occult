@@ -1,7 +1,7 @@
 The purpose of this program is to schedule streaming of several stars through the night to automatically capture stellar occultations by asteroids. 
 It uses INDI drivers and follows the INDI Protocol to control a mount and a CCD camera from a RaspberryPi computer.
 
-The architecture of the INDI Protocol
+### The architecture of the INDI Protocol
 
 
 <img width="492" alt="INDIarchitecture" src="https://user-images.githubusercontent.com/105792791/218797218-626ab47b-a6e5-4d77-a010-176f20ef06e7.PNG">
@@ -9,7 +9,7 @@ The architecture of the INDI Protocol
 source: https://www.frontiersin.org/articles/10.3389/fspas.2022.895732/full
 
 
-Structure of the installation
+### Structure of the installation
 ![structure](https://user-images.githubusercontent.com/105792791/218798228-31a61e17-e6e3-4f57-b9dc-e143fa339678.jpg)
 
 
@@ -30,8 +30,8 @@ Here is how the program works.
 5. termination of the server
 
 
-I/ Setting up the installation
-  1. initializing the server and client
+# I/ Setting up the installation
+  ## 1. initializing the server and client
 	
   This code is using the open source software INDI to control the telescope orientation and camera trigger. So before anything else, an INDI server needs to be launched and an INDI client needs to be initialized: the server will run the commands, and the client will control the devices from the server.
 	
@@ -41,7 +41,7 @@ I/ Setting up the installation
 
   To initialize the client, we need to create a subclass to the original INDI class responsible for creating clients : BaseClient. The subclass (called IndiClient) inherits the properties and methods of BaseClient (e.g. newDevice() etc). None of the methods need to be overridden in theory, but overriding the newBLOB method enables the use of Python module threading, which will prove useful to be able to continue capturing new data while processing data that has just been captured. Once the client subclass has been created, we need to create an instance of IndiClient, and link it to the server. Once the client is connected to the server, the set up of the devices can begin.
 
-  2. setting up the devices
+ ## 2. setting up the devices
 	
   To be able to control the doings of the telescope and the camera, they first have to be recognized by the client. 
 
@@ -57,7 +57,7 @@ I/ Setting up the installation
 
 ![properties](https://user-images.githubusercontent.com/105792791/218799526-040d9522-9d9a-404f-91af-b61fe3184488.jpg)
 
-II/ The main function
+# II/ The main function
 
   The main function is the function that will trigger the pictures and streams of a chosen star at a chosen time. It takes in argument a text file containing information on stars to captured and when and how to capture them. This text file changes every night. Each line of the file represents a star.
 
@@ -68,7 +68,7 @@ The main function is divided in three parts for each star:
 
 The calibration of the telescope and the capture of the stream are set to start respectively five minutes (see value of DELAY) before and at the time given in the text file. The telescope is parked once the stream recording has ended.
 
-1. calibration of the telescope
+## 1. calibration of the telescope
 	
 The calibration itself is divided into three (or four) parts (see Figure):
 - making sure the star is visible, 
@@ -84,7 +84,7 @@ The calibration itself is divided into three (or four) parts (see Figure):
 	
   In any case, the program then moves on to capturing a picture of the sky, which will serve as a control image.
 
-2. capture of the stream
+## 2. capture of the stream
 	
 The steps to capturing the stream are fairly straightforward:
 - starting the stream (setting the streaming property switch ON)
@@ -93,28 +93,28 @@ The steps to capturing the stream are fairly straightforward:
 - starting the recording of the stream
 - turning the stream of once the duration of the recording's passed
 	
-3. parking of the telescope
+## 3. parking of the telescope
 	
   To park the telescope, the telescope property for parking is switched on, and the telescope will move to predefined parking coordinates. Then, we make sure the tracking mode of the telescope is disabled so that the telescope does not move until the next target's time has come. 
 
 ![main](https://user-images.githubusercontent.com/105792791/218799919-626b37ef-00ba-4238-b944-7c8e0c749587.jpg)
 
 
-III/ Details for secondary functions
-  1. EnterNewCoordinates
+# III/ Details for secondary functions
+ ## 1. EnterNewCoordinates
 	
   This function gives the telescope new equatorial coordinates to track, and waits for it to be locked on its new position (by interrogating the state of the property and waiting until it is not BUSY anymore).
 	
-  2. CapturePictures
+ ## 2. CapturePictures
 	
   This function takes in argument a star and a list of exposures to capture the star with. For every given exposure, the program will wait for the previous picture to have been captured before taking a new one, while the first one is being processed and saved to a fits file, the name of which contains information on the star itself and the time of the capture. All pictures are saved into a folder named with the current date. 
 The function returns a list of the names of the paths. The use of this function in the main function is restricted to one exposure each time it is called, and the path returned is used for astrometry.net.
 	
-  3. MagnitudeToExposure
+ ## 3. MagnitudeToExposure
 	
   The aim of this function is to give an equivalent of exposure for magnitude given, in a way that the relation between magnitude and exposure is the same for every star (no matter the magnitude).
 
 
-IV/ Terminating the program
+# IV/ Terminating the program
 
   Once the all the stars have been captured, it is time to properly stop the program. First, the devices have to be disconnected from the server (the same way they were connected to it). NB: the CCD camera's cooler should be turned off before disconnecting the camera. Once the devices are disconnecting, the server can be killed through a terminal, and the Raspberry PI can be shutdown.

@@ -114,6 +114,39 @@ indiclient.sendNewNumber(ccd_temperature)
 
 ![properties](https://user-images.githubusercontent.com/105792791/218799526-040d9522-9d9a-404f-91af-b61fe3184488.jpg)
 
+## 3. setting the values for the constants
+
+  Before getting started, the constants have to be adapted. First, the indiserver launching command in the terminal depends on the type of each device, so it's important to change the line to whatever type of devices we have. Just as important are the names of the devices that we wish to connect to INDI. Their names can be found in the terminal after executing the indiserver command, or by launching the server with KStars/Ekos.
+  
+``` 
+TELESCOPE_NAME = "Synscan"
+CCD_NAME = "QHY CCD QHY174M-7a6fbf4"
+```
+
+  Another set of constants that will probably need to be changed is that of the coordinates of the telescope. In this case, the telescope is located at the OCA, so the constants LATITUDE, LONGITUDE and ELEVATION correspond to the observatory. The OBSERVER constant uses astroplan to create an Observer instance corresponding to the location of the telescope.
+  
+```
+LATITUDE = 43.78944444
+LONGITUDE = 7.26298334
+ELEVATION = 369.0
+NAME = "OCA"
+TIMEZONE = "Europe/Paris"
+OBSERVER = Observer(longitude=LONGITUDE*u.deg, latitude=LATITUDE*u.deg, elevation=ELEVATION*u.m, name=NAME, timezone=TIMEZONE)
+```
+
+  Next, the names of the files on which the coordinates are written can be changed. CSV_FILENAME is the name of the already existing CSV file giving the program the coordinates of the stars to observe, and TXT_FILENAME is the name of the TXT file that will be created within the program. 
+  
+```
+CSV_FILENAME = 'all_coordinates_CSV.csv'
+TXT_FILENAME = 'all_coordinates_TXT.txt'
+```
+
+Finally, the DELAY constant corresponds to the number of seconds prior to the start time given in the CSV file at which to start the calibration of the telescope. For example, here, the calibration of the telescope will start 5 minutes (300 seconds) before the time at which we want to start recording the stream.
+
+```
+DELAY = 300 # number of seconds to start-time to start calibrating
+```
+
 # II/ The main function
 
   The main function is the function that will trigger the pictures and streams of a chosen star at a chosen time. It takes in argument a CSV file containing information on stars to captured and when and how to capture them (see [example](https://github.com/jdescloitres/stellar-occult/blob/main/all_coordinates_CSV_example.csv)). This CSV file changes every night. Each line of the file represents a star. To simplify the code, this content of the CSV file is then represented as dictionnaries in a TXT file (see CSV_TO_TXT).

@@ -38,22 +38,67 @@ Here is how the program works.
   
 ``` indiserver -v indi_qhy_ccd indi_synscan_telescope ```
 
-  To initialize the client, we need to create a subclass to the original INDI class responsible for creating clients : BaseClient. The subclass (called IndiClient) inherits the properties and methods of BaseClient (e.g. *newDevice()* etc). None of the methods need to be overridden in theory, but overriding the *newBLOB()* method enables the use of Python module threading, which will prove useful to be able to continue capturing new data while processing data that has just been captured. Once the client subclass has been created, we need to create an instance of IndiClient, and link it to the server. Once the client is connected to the server, the set up of the devices can begin.
+  To initialize the client, we need to create a subclass to the original INDI class responsible for creating clients : BaseClient. The subclass (called IndiClient) inherits the properties and methods of BaseClient (e.g. *newDevice()* etc). None of the methods need to be overridden in theory, but overriding the *newBLOB()* method enables the use of Python module threading, which will prove useful to be able to continue capturing new data while processing data that has just been captured. The *newProperty()* method can also be overridden to display all properties for all devices (see [commented lines](https://github.com/jdescloitres/stellar-occult/blob/8d35b0a24db68d4415e321e34fa352013d766600/client.py#L56) in client.py). 
+  
+``` 
+class IndiClient(PyIndi.BaseClient):
+    def __init__(self) :
+        super(IndiClient, self).__init__()
+    def newDevice(self, d):
+        pass   
+    def newProperty(self, p):
+        pass       
+    def removeProperty(self, p):
+        pass
+    
+    def newBLOB(self, bp):
+        global blobEvent
+        print("new BLOB ", bp.name)
+        blobEvent.set()
+        pass
+
+    def newSwitch(self, svp):
+        pass
+    def newNumber(self, nvp):
+        pass
+    def newText(self, tvp):
+        pass
+    def newLight(self, lvp):
+        pass
+    def newMessage(self, d, m):
+        pass
+    def serverConnected(self):
+        pass
+    def serverDisconnected(self, code):
+        pass  
+``` 
+
+  Once the client subclass has been created, we need to create an instance of IndiClient, and link it to the server. Once the client is connected to the server, the set up of the devices can begin.
+  
+``` 
+indiclient = IndiClient()
+indiclient.setServer("localhost", 7624)
+```
 
  ## 2. setting up the devices
 	
-  To be able to control the doings of the telescope and the camera, they first have to be recognized by the client. 
+  To be able to control the doings of the telescope and the camera, they first have to be recognized by the client. Here is the example for the camera.
 
 ``` 
 ccd = "QHY CCD QHY174M-7a6fbf4" 
 device_ccd = indiclient.getDevice(ccd)
+``` 
+ Once they are, they have to be connected to the server, after which all properties will be controllable through the server with predefined commands.
+
+```
 ccd_connect = device_ccd.getSwitch("CONNECTION")
 if not device_ccd.isConnected():
     ccd_connect[0].s = PyIndi.ISS_ON      # this is the CONNECT switch
     ccd_connect[1].s = PyIndi.ISS_OFF     # this is the DISCONNECT switch
     indiclient.sendNewSwitch(ccd_connect)
 ```
-  Once they are, they have to be connected to the server, after which all properties will be controllable through the server with predefined commands. Here is how setting the properties works, illustrated by the example of the CCD's temperature property.
+
+  Here is how setting the properties works, illustrated by the example of the CCD's temperature property.
 
 ``` 
 ccd_temperature = device_ccd.getNumber("CCD_TEMPERATURE")
@@ -71,27 +116,58 @@ indiclient.sendNewNumber(ccd_temperature)
 
 # II/ The main function
 
-  The main function is the function that will trigger the pictures and streams of a chosen star at a chosen time. It takes in argument a text file containing information on stars to captured and when and how to capture them. This text file changes every night. Each line of the file represents a star.
+  The main function is the function that will trigger the pictures and streams of a chosen star at a chosen time. It takes in argument a CSV file containing information on stars to captured and when and how to capture them (see [example](https://github.com/jdescloitres/stellar-occult/blob/main/all_coordinates_CSV_example.csv)). This CSV file changes every night. Each line of the file represents a star. To simplify the code, this content of the CSV file is then represented as dictionnaries in a TXT file (see CSV_TO_TXT).
 
 The main function is divided in three parts for each star:
 - calibration of the telescope
 - capture of the stream
 - parking the telescope before next star
 
-The calibration of the telescope and the capture of the stream are set to start respectively five minutes (see value of DELAY) before and at the time given in the text file. The telescope is parked once the stream recording has ended.
+The calibration of the telescope and the capture of the stream are set to start respectively five minutes (see value of DELAY) before and at the time given in the text file, with the help of the scheduler function. 
+
+```
+s = sched.scheduler(time.time)
+s.enterabs(star['start'] - DELAY, 1, CalibrateTelescope, kwargs = (star))
+s.run()
+```
+
+The telescope is parked once the stream recording has ended.
 
 ## 1. calibration of the telescope
 	
 The calibration itself is divided into three (or four) parts (see Figure):
-- making sure the star is visible, 
+- making sure the star is visible
 - making sure the telescope is pointing in the correct direction
 - (and recalibrating it if not)
 - capturing a control picture for future analysis
 	
  The first step to calibrating the telescope is making sure the star we are directing it to is in fact visible at this time of night. To do so, we are using the astroplan library, and giving it the scope's coordinates on Earth, the coordinates of the target (star), and the time.
+ 
+```
+star_coord = SkyCoord(ra = star['ra']*u.deg, dec = star['dec']*u.deg)
+target = FixedTarget(coord = star_coord)
+time = Time(datetime.now())
+h = OCA.altaz(time, target).alt		# h is the current altitude of the star
+```
   If the star is not yet visible, the program will stop the calibration and move on to the next target in the text file.
   If the star is visible, however, the program carries on with the next step: checking the accuracy of the telescope's coordinates. The coordinates of the star are given to the telescope for it to move to them. Once the telescope is locked on a direction (and tracking it), a picture is captured. This picture is then analyzed by astrometry.net, which will return (if the stars are recognizable) the actual coordinates of the portion of the sky the telescope is pointing to. 
-  If the difference - between the coordinates given to the telescope and the actual ones returned by astrometry.net - is small enough, the telescope is considered already calibrating. 
+  
+``` 
+ reply = os.popen('solve-field --ra ' + str(star['ra']*360.0/24.0) + ' --dec ' + str(star['dec']) + ' --radius 10 ' + img_path + ' --overwrite')
+output = reply.read()
+if "Field center: (RA,Dec)" in output :
+	coordinates_str = output.split("Field center: (RA,Dec) = (",1)[1]
+	coordinates_cpl = coordinates_str.split(")")[0]
+	alpha0 = float(coordinates_cpl.split(", ")[0]) * 24.0/360.0
+	delta0 = float(coordinates_cpl.split(", ")[1]) * 24.0/360.0
+	logging.info('Stars recognized, coordinates found are (' + str(alpha0) + ', ' + str(delta0) + ')')
+else :
+	print("Stars are not recognizable - ignoring calibration")
+	alpha0 = star['ra']
+	delta0 = star['dec']*24.0/360.0
+```
+
+  If the difference - between the coordinates given to the telescope and the actual ones returned by astrometry.net - is small enough, the telescope is considered already calibrated. 
   If not, the telescope is then synced to the coordinates returned by astrometry.net
 	
   In any case, the program then moves on to capturing a picture of the sky, which will serve as a control image.
@@ -108,6 +184,17 @@ The steps to capturing the stream are fairly straightforward:
 ## 3. parking of the telescope
 	
   To park the telescope, the telescope property for parking is switched on, and the telescope will move to predefined parking coordinates. Then, we make sure the tracking mode of the telescope is disabled so that the telescope does not move until the next target's time has come. 
+  
+```
+telescope_park[0].s = PyIndi.ISS_ON  # this is the PARK switch
+telescope_park[1].s = PyIndi.ISS_OFF # this is the UNPARK switch
+indiclient.sendNewSwitch(telescope_park)
+while telescope_park.getState() == PyIndi.IPS_BUSY:
+    time.sleep(2)
+print('Telescope parked')
+```
+
+### Visual representation of the main function
 
 ![main](https://user-images.githubusercontent.com/105792791/218799919-626b37ef-00ba-4238-b944-7c8e0c749587.jpg)
 
@@ -130,3 +217,12 @@ The function returns a list of the names of the paths. The use of this function 
 # IV/ Terminating the program
 
   Once the all the stars have been captured, it is time to properly stop the program. First, the devices have to be disconnected from the server (the same way they were connected to it). NB: the CCD camera's cooler should be turned off before disconnecting the camera. Once the devices are disconnecting, the server can be killed through a terminal, and the Raspberry PI can be shutdown.
+
+```
+# killing the indiserver
+os.popen('touch /tmp/noindi')
+os.popen('sudo pkill indiserver')
+
+# shutting down the raspberry
+os.popen('sudo shutdown -h now')
+```

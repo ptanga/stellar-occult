@@ -271,7 +271,7 @@ logging.info('Camera and Telescope linked')
 led_calibration = device_ccd.getSwitch("LED_CALIBRATION")
 while not led_calibration:
     time.sleep(0.5)
-    led_calibration = dyevice_ccd.getSwitch("LED_CALIBRATION")
+    led_calibration = device_ccd.getSwitch("LED_CALIBRATION")
 led_calibration[0].s = PyIndi.ISS_OFF  # this is the LED_ON switch
 led_calibration[1].s = PyIndi.ISS_ON   # this is the LED_OFF switch
 indiclient.sendNewSwitch(led_calibration)
@@ -282,7 +282,7 @@ logging.info('LED turned off')
 slaving_mode = device_ccd.getSwitch("SLAVING_MODE")
 while not slaving_mode:
     time.sleep(0.5)
-    slaving_mode = dyevice_ccd.getSwitch("SLAVING_MODE")
+    slaving_mode = device_ccd.getSwitch("SLAVING_MODE")
 slaving_mode[0].s = PyIndi.ISS_ON    # this is the MASTER switch
 slaving_mode[1].s = PyIndi.ISS_OFF   # this is the SLAVE switch
 indiclient.sendNewSwitch(slaving_mode)

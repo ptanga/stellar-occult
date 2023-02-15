@@ -31,7 +31,7 @@ import pandas as pd
 
 
 # Constants
-TELESCOPE_NAME = "Synscan"
+TELESCOPE_NAME = "SynScan"
 CCD_NAME = "QHY CCD QHY174M-7a6fbf4"
 
 LATITUDE = 43.78944444
@@ -71,15 +71,18 @@ class IndiClient(PyIndi.BaseClient):
 #             tpy=p.getLight()
 #             for t in tpy:
 #                 print("       "+t.name+"("+t.label+")= ")
-#         if p.getType()==PyIndi.INDI_TEXT:
+#         elif p.getType()==PyIndi.INDI_TEXT:
 #             tpy=p.getText()
 #             for t in tpy:
 #                 print("       "+t.name+"("+t.label+")= "+t.text)
-#         if p.getType()==PyIndi.INDI_NUMBER:
+#         elif p.getType()==PyIndi.INDI_NUMBER:
 #             tpy=p.getNumber()
 #             for t in tpy:
 #                 print("       "+t.name+"("+t.label+")= "+str(t.value))
-
+#         elif p.getType()==PyIndi.INDI_BLOB:
+#             tpy=p.getBLOB()
+#             for t in tpy:
+#                 print("       "+t.name+"("+t.label+")= <blob "+str(t.size)+" bytes>")
         pass
         
     def removeProperty(self, p):
@@ -112,24 +115,21 @@ class IndiClient(PyIndi.BaseClient):
 
 indiclient = IndiClient()
 indiclient.setServer("localhost", 7624)
-# indiclient.watchDevice("Telescope Simulator")
 indiclient.watchDevice(TELESCOPE_NAME)
 indiclient.watchDevice(CCD_NAME)
-# indiclient.watchDevice("CCD Simulator")
 
 if not indiclient.connectServer():            # if no indiserver is detected
-# if not indiclient.isServerConnected():            # if no indiserver is detected
     print("No indiserver running on " + indiclient.getHost() + " : " + str(indiclient.getPort()) + " - Try to run")
     print("indiserver indi_synscan_telescope indi_qhy_ccd")
-#     sys.exit(1)            # why ?
+#     sys.exit(1)
 
 logging.info('Server connected')
   
-# setting up the telescope (see client.py)
+# setting up the telescope
 
 ## connecting the telescope
-# telescope ="Telescope Simulator"
-telescope = TELESCOPE_NAME           # change name of telescope if needed
+telescope = TELESCOPE_NAME
+print(telescope)
 device_telescope = None
 telescope_connect = None
 
@@ -145,7 +145,7 @@ while not telescope_connect :
     time.sleep(0.5)
     telescope_connect = device_telescope.getSwitch("CONNECTION")
 
-# connection of the telescope device (this would be an example of STEP THREE : editing a property)
+# connection of the telescope device
 if not device_telescope.isConnected():          # no use in connecting it if it is already connected
     telescope_connect[0].s = PyIndi.ISS_ON      # the first item of the CONNECTION property array is the CONNECT switch, which needs to be ON
     telescope_connect[1].s = PyIndi.ISS_OFF     # the second item of the CONNECTION property array is the DISCONNECT switch, which needs to be OFF
@@ -179,7 +179,6 @@ if SET_COORD:
 
 # connecting the CCD
 ccd = CCD_NAME
-# ccd = "CCD Simulator"
 device_ccd = None
 ccd_connect = None
 
@@ -190,29 +189,6 @@ while not device_ccd:
     device_ccd = indiclient.getDevice(ccd)
     print('restart the server or plug the camera back in')
     logging.warning('Unable to see the camera')
-# lp = device_ccd.getProperties()
-# for p in lp:
-#     print("   > "+p.getName())
-#     if p.getType()==PyIndi.INDI_TEXT:
-#         tpy=p.getText()
-#         for t in tpy:
-#             print("       "+t.name+"("+t.label+")= "+t.text)
-#     elif p.getType()==PyIndi.INDI_NUMBER:
-#         tpy=p.getNumber()
-#         for t in tpy:
-#             print("       "+t.name+"("+t.label+")= "+str(t.value))
-#     elif p.getType()==PyIndi.INDI_SWITCH:
-#         tpy=p.getSwitch()
-#         for t in tpy:
-#             print("       "+t.name+"("+t.label+")= "+strISState(t.s))
-#     elif p.getType()==PyIndi.INDI_LIGHT:
-#         tpy=p.getLight()
-#         for t in tpy:
-#             print("       "+t.name+"("+t.label+")= "+strIPState(t.s))
-#     elif p.getType()==PyIndi.INDI_BLOB:
-#         tpy=p.getBLOB()
-#         for t in tpy:
-#             print("       "+t.name+"("+t.label+")= <blob "+str(t.size)+" bytes>")
 
 # waiting until the CONNECTION property is defined (with the def*) by the CCD
 ccd_connect = device_ccd.getSwitch("CONNECTION")
@@ -221,7 +197,6 @@ while not ccd_connect :
     ccd_connect = device_ccd.getSwitch("CONNECTION")
     print('Make sure camera is plugged in, and indi_qhy_ccd is running')
     logging.warning('Unable to connect to the camera')
-
 
 # connection of the CCD device
 if not device_ccd.isConnected():          # no use in connecting it if it is already connected
@@ -257,9 +232,7 @@ ccd_active_devices = device_ccd.getText("ACTIVE_DEVICES")
 while not ccd_active_devices:
     time.sleep(0.5)
     ccd_active_devices = device_ccd.getText("ACTIVE_DEVICES")
-# ccd_active_devices[0].text = "Telescope Simulator"
 ccd_active_devices[0].text = TELESCOPE_NAME
-# ccd_active_devices[5].text = "GPS Simulator"
 indiclient.sendNewText(ccd_active_devices)
 
 print('ccd ok')
@@ -289,41 +262,45 @@ indiclient.sendNewSwitch(slaving_mode)
  
 logging.info('GPS Master mode activated')
 
-# # enabling the GPS Header
-# gps_header = device_ccd.getText("GPS_DATA_HEADER")
-# while not gps_header:
-#     time.sleep(0.5)
-#     gps_header = device_ccd.getText("GPS_DATA_HEADER")
-# gps_header[0].text = "something"
-# gps_header[1].text = "something"
-# indiclient.sendNewText(gps_header)
-# 
-# logging.info('GPS header set')
+# enabling the GPS Header
+gps_header = device_ccd.getSwitch("GPS_CONTROL")
+while not gps_header:
+    time.sleep(0.5)
+    gps_header = device_ccd.getSwitch("GPS_CONTROL")
+gps_header[0].s = PyIndi.ISS_ON
+gps_header[1].s = PyIndi.ISS_OFF
+indiclient.sendNewSwitch(gps_header)
+
+logging.info('GPS header set')
 
 # starting test Stream for the GPS to lock
 ccd_video_stream = device_ccd.getSwitch("CCD_VIDEO_STREAM")
 while not ccd_video_stream:
     time.sleep(0.5)
     ccd_video_stream = device_ccd.getSwitch("CCD_VIDEO_STREAM")
-# ccd_video_stream[0].s = PyIndi.ISS_ON       # this is the STREAM_ON switch
-# ccd_video_stream[1].s = PyIndi.ISS_OFF       # this is the STREAM_OFF switch
-# indiclient.sendNewSwitch(ccd_video_stream)
-# 
-# # making sure the GPS is locked 
-# gps_state = device_ccd.getLight("GPS_STATE")
-# while not gps_state:
-#     time.sleep(0.5)
-#     gps_state = device_ccd.getLight("GPS_STATE")
-# while not (gps_state[0].s == PyIndi.IPS_IDLE and gps_state[1].s == PyIndi.IPS_IDLE and gps_state[2].s == PyIndi.IPS_IDLE and gps_state[3].s == PyIndi.IPS_BUSY) : # these are the POWERED, SEARCHING, LOCKING, LOCKED lights
-#     time.sleep(1)
-# 
-# # turning the stream off
-# ccd_video_stream[0].s = PyIndi.ISS_OFF      # this is the STREAM_ON switch
-# ccd_video_stream[1].s = PyIndi.ISS_ON       # this is the STREAM_OFF switch
-# indiclient.sendNewSwitch(ccd_video_stream)
-# 
-# print("gps ok")
-# logging.info('GPS locked')
+ccd_video_stream[0].s = PyIndi.ISS_ON       # this is the STREAM_ON switch
+ccd_video_stream[1].s = PyIndi.ISS_OFF       # this is the STREAM_OFF switch
+indiclient.sendNewSwitch(ccd_video_stream)
+
+print("stream on")
+
+# making sure the GPS is locked 
+gps_state = device_ccd.getLight("GPS_STATE")
+while not gps_state:
+    time.sleep(0.5)
+    gps_state = device_ccd.getLight("GPS_STATE")
+# while not (gps_state[0].s == PyIndi.IPS_IDLE and gps_state[1].s == PyIndi.IPS_IDLE and gps_state[2].s == PyIndi.IPS_IDLE and gps_state[3].s == PyIndi.IPS_OK) : # these are the POWERED, SEARCHING, LOCKING, LOCKED lights
+while not (gps_state[0].s == PyIndi.IPS_IDLE and gps_state[1].s == PyIndi.IPS_IDLE and gps_state[2].s == PyIndi.IPS_IDLE and gps_state[3].s == PyIndi.IPS_BUSY) : # these are the POWERED, SEARCHING, LOCKING, LOCKED lights
+    time.sleep(1)
+    print("second loop")
+
+# turning the stream off
+ccd_video_stream[0].s = PyIndi.ISS_OFF      # this is the STREAM_ON switch
+ccd_video_stream[1].s = PyIndi.ISS_ON       # this is the STREAM_OFF switch
+indiclient.sendNewSwitch(ccd_video_stream)
+
+print("gps ok")
+logging.info('GPS locked')
 
 # unparking telescope
 telescope_park = device_telescope.getSwitch("TELESCOPE_PARK")
@@ -728,7 +705,7 @@ def main(csv_filename = CSV_FILENAME, txt_filename = TXT_FILENAME):
 #         
     print("All tasks done, disconnecting server")
     
-main()
+# main()
 # indiclient.disconnectServer()
 
 # turning cooling off

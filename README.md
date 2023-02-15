@@ -153,7 +153,7 @@ h = OCA.altaz(time, target).alt		# h is the current altitude of the star
   If the star is visible, however, the program carries on with the next step: checking the accuracy of the telescope's coordinates. The coordinates of the star are given to the telescope for it to move to them. Once the telescope is locked on a direction (and tracking it), a picture is captured. This picture is then analyzed by astrometry.net, which will return (if the stars are recognizable) the actual coordinates of the portion of the sky the telescope is pointing to. 
   
 ``` 
- reply = os.popen('solve-field --ra ' + str(star['ra']*360.0/24.0) + ' --dec ' + str(star['dec']) + ' --radius 10 ' + img_path + ' --overwrite')
+reply = os.popen('solve-field --ra ' + str(star['ra']*360.0/24.0) + ' --dec ' + str(star['dec']) + ' --radius 10 ' + img_path + ' --overwrite')
 output = reply.read()
 if "Field center: (RA,Dec)" in output :
 	coordinates_str = output.split("Field center: (RA,Dec) = (",1)[1]

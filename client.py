@@ -51,7 +51,6 @@ SET_TIME = True
 SET_COORD = False
 
 
-
 visible = True
 
 

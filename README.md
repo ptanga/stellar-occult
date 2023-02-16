@@ -141,7 +141,7 @@ CSV_FILENAME = 'all_coordinates_CSV.csv'
 TXT_FILENAME = 'all_coordinates_TXT.txt'
 ```
 
-Tthe DELAY constant corresponds to the number of seconds prior to the start time given in the CSV file at which to start the calibration of the telescope. For example, here, the calibration of the telescope will start 5 minutes (300 seconds) before the time at which we want to start recording the stream. Finally, the RADIUS constant corresponds to the radius entered during the astrometry.net search, which is the radius from the given coordinates for it to look for known recognizable stars. 
+The DELAY constant corresponds to the number of seconds prior to the start time given in the CSV file at which to start the calibration of the telescope. For example, here, the calibration of the telescope will start 5 minutes (300 seconds) before the time at which we want to start recording the stream. Finally, the RADIUS constant corresponds to the radius entered during the astrometry.net search, which is the radius from the given coordinates for it to look for known recognizable stars. 
 
 ```
 DELAY = 300 # number of seconds to start-time to start calibrating

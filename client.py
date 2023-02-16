@@ -45,6 +45,7 @@ CSV_FILENAME = 'all_coordinates_CSV.csv'
 TXT_FILENAME = 'all_coordinates_TXT.txt'
 
 DELAY = 300 # number of seconds to start-time to start calibrating
+RADIUS = 10 # radius given to astrometry.net search
 
 SET_TIME = True
 SET_COORD = False
@@ -579,7 +580,7 @@ def CalibrateTelescope(**star):
     # analysis of the picture
     print('Analysing image')
     
-#     reply = os.popen('solve-field --ra ' + str(star['ra']*360.0/24.0) + ' --dec ' + str(star['dec']) + ' --radius 10 ' + img_path + ' --overwrite')
+#     reply = os.popen('solve-field --ra ' + str(star['ra']*360.0/24.0) + ' --dec ' + str(star['dec']) + ' --radius ' + RADIUS + ' ' + img_path + ' --overwrite')
 #     output = reply.read()
 #     if "Field center: (RA,Dec)" in output :
 #         coordinates_str = output.split("Field center: (RA,Dec) = (",1)[1]

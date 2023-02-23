@@ -35,8 +35,8 @@ import pandas as pd
 
 
 # Constants
-# TELESCOPE_NAME = "SynScan"
-TELESCOPE_NAME = "Telescope Simulator"
+TELESCOPE_NAME = "SynScan"
+# TELESCOPE_NAME = "Telescope Simulator"
 # CCD_NAME = "CCD Simulator"
 CCD_NAME = "QHY CCD QHY174M-7a6fbf4"
 
@@ -51,15 +51,17 @@ CSV_FILENAME = 'all_coordinates_CSV.csv'
 TXT_FILENAME = 'all_coordinates_TXT.txt'
 
 DELAY = 300 # number of seconds to start-time to start calibrating
+TIMEOUT = 60 # number of seconds until camera is considered not working
 RADIUS = 10 # radius given to astrometry.net search
 MAGNITUDE0 = 9
-EXPOSURE0 = 5 # an exposure of EXPOSURE0 for a star of magnitude MAGNITUDE0 will set the equivalent for other magnitudes
+EXPOSURE0 = 0.05 # an exposure of EXPOSURE0 for a star of magnitude MAGNITUDE0 will set the equivalent for other magnitudes
 
 SET_TIME = False
 SET_COORD = False
 
 
 visible = True
+flag = True
 
 
 # initializing the client
@@ -70,27 +72,27 @@ class IndiClient(PyIndi.BaseClient):
         pass
     
     def newProperty(self, p):
-#         print("New ", p.getType(), " property ", p.getName(), " for device ", p.getDeviceName())
-#         if p.getType()==PyIndi.INDI_SWITCH:
-#             tpy=p.getSwitch()
-#             for t in tpy:
-#                 print("       "+t.name+"("+t.label+")= ")
-#         elif p.getType()==PyIndi.INDI_LIGHT:
-#             tpy=p.getLight()
-#             for t in tpy:
-#                 print("       "+t.name+"("+t.label+")= ")
-#         elif p.getType()==PyIndi.INDI_TEXT:
-#             tpy=p.getText()
-#             for t in tpy:
-#                 print("       "+t.name+"("+t.label+")= "+t.text)
-#         elif p.getType()==PyIndi.INDI_NUMBER:
-#             tpy=p.getNumber()
-#             for t in tpy:
-#                 print("       "+t.name+"("+t.label+")= "+str(t.value))
-#         elif p.getType()==PyIndi.INDI_BLOB:
-#             tpy=p.getBLOB()
-#             for t in tpy:
-#                 print("       "+t.name+"("+t.label+")= <blob "+str(t.size)+" bytes>")
+        print("New ", p.getType(), " property ", p.getName(), " for device ", p.getDeviceName())
+        if p.getType()==PyIndi.INDI_SWITCH:
+            tpy=p.getSwitch()
+            for t in tpy:
+                print("       "+t.name+"("+t.label+")= ")
+        elif p.getType()==PyIndi.INDI_LIGHT:
+            tpy=p.getLight()
+            for t in tpy:
+                print("       "+t.name+"("+t.label+")= ")
+        elif p.getType()==PyIndi.INDI_TEXT:
+            tpy=p.getText()
+            for t in tpy:
+                print("       "+t.name+"("+t.label+")= "+t.text)
+        elif p.getType()==PyIndi.INDI_NUMBER:
+            tpy=p.getNumber()
+            for t in tpy:
+                print("       "+t.name+"("+t.label+")= "+str(t.value))
+        elif p.getType()==PyIndi.INDI_BLOB:
+            tpy=p.getBLOB()
+            for t in tpy:
+                print("       "+t.name+"("+t.label+")= <blob "+str(t.size)+" bytes>")
         pass
         
     def removeProperty(self, p):
@@ -119,7 +121,7 @@ class IndiClient(PyIndi.BaseClient):
 
 
 ## connecting the indiserver
-# os.popen('indiserver -v indi_qhy_ccd indi_synscan_telescope')
+# os.popen('indiserver -v indi_qhy_ccd indi_synscan_telescope indi_pegasus_ppba')
 
 indiclient = IndiClient()
 indiclient.setServer("localhost", 7624)
@@ -225,13 +227,13 @@ ccd_temperature[0].value = -10
 indiclient.sendNewNumber(ccd_temperature)
 
 # switching the cooler on
-ccd_cooler = device_ccd.getSwitch("CCD_COOLER")
-while not ccd_cooler:
-    time.sleep(0.5)
-    ccd_cooler = device_ccd.getSwitch("CCD_COOLER")
-ccd_cooler[0].s = PyIndi.ISS_ON       # this is the COOLER_ON switch
-ccd_cooler[1].s = PyIndi.ISS_OFF      # this is the COOLER_OFF switch
-indiclient.sendNewSwitch(ccd_cooler)
+# ccd_cooler = device_ccd.getSwitch("CCD_COOLER")
+# while not ccd_cooler:
+#     time.sleep(0.5)
+#     ccd_cooler = device_ccd.getSwitch("CCD_COOLER")
+# ccd_cooler[0].s = PyIndi.ISS_ON       # this is the COOLER_ON switch
+# ccd_cooler[1].s = PyIndi.ISS_OFF      # this is the COOLER_OFF switch
+# indiclient.sendNewSwitch(ccd_cooler)
 
 logging.info('Camera is cooling down')
 
@@ -245,6 +247,25 @@ indiclient.sendNewText(ccd_active_devices)
 
 print('ccd ok')
 logging.info('Camera and Telescope linked')
+
+# Making sure to get max speed from USB connection to camera
+usb_buffer = device_ccd.getNumber("USB_BUFFER")
+while not usb_buffer:
+    time.sleep(0.5)
+    usb_buffer = device_ccd.getNumber("USB_BUFFER")
+if usb_buffer[0].value != 2048:
+    logging.info('Setting USB buffer to 2048')
+    usb_buffer[0].value = 2048
+    indiclient.sendNewNumber(usb_buffer)
+
+# making sure the resolution is 16bit
+ccd_bpp = device_ccd.getNumber("CCD_BITSPERPIXEL")
+while not ccd_bpp:
+    time.sleep(0.5)
+    ccd_bpp = device_ccd.getNumber("CCD_BITSPERPIXEL")
+ccd_bpp[0].value = 16
+indiclient.sendNewNumber(ccd_bpp)
+
 
 # getting the GPS ready
 
@@ -297,7 +318,7 @@ gps_state = device_ccd.getLight("GPS_STATE")
 while not gps_state:
     time.sleep(0.5)
     gps_state = device_ccd.getLight("GPS_STATE")
-while not (gps_state[0].s == PyIndi.IPS_IDLE and gps_state[1].s == PyIndi.IPS_IDLE and gps_state[2].s == PyIndi.IPS_IDLE and gps_state[3].s == PyIndi.IPS_BUSY) : # these are the POWERED, SEARCHING, LOCKING, LOCKED lights
+# while not (gps_state[0].s == PyIndi.IPS_IDLE and gps_state[1].s == PyIndi.IPS_IDLE and gps_state[2].s == PyIndi.IPS_IDLE and gps_state[3].s == PyIndi.IPS_BUSY) : # these are the POWERED, SEARCHING, LOCKING, LOCKED lights
     time.sleep(1)
     print(gps_state[0].s, gps_state[1].s, gps_state[2].s, gps_state[3].s)
 
@@ -319,6 +340,14 @@ telescope_park[1].s = PyIndi.ISS_ON   # this is the UNPARK switch
 indiclient.sendNewSwitch(telescope_park)
 logging.info('Telescope unparked')
 
+telescope_park_positions = device_telescope.getNumber("TELESCOPE_PARK_POSITIONS")
+# while not telescope_park_positions:
+#     time.sleep(0.5)
+#     telescope_park_positions = device_telescope.getNumber("TELESCOPE_PARK_POSITIONS")
+# telescope_park_positions[0].value = 179
+# telescope_park_positions[1].value = 1
+# indiclient.sendNewNumber(telescope_park_positions)
+# logging.info('Telescope unparked')
 
 # enabling tracking of a star in the property ON_COORD_SET
 telescope_on_coord_set = device_telescope.getSwitch("ON_COORD_SET")
@@ -344,21 +373,30 @@ ccd_exposure = device_ccd.getNumber("CCD_EXPOSURE")
 while not ccd_exposure:
     time.sleep(0.5)
     ccd_exposure = device_ccd.getNumber("CCD_EXPOSURE")
+    
+ccd_stream_frame = device_ccd.getNumber("CCD_STREAM_FRAME")
+while not ccd_stream_frame:
+    time.sleep(0.5)
+    ccd_stream_frame = device_ccd.getNumber("CCD_STREAM_FRAME")
+
+ccd_frame = device_ccd.getNumber("CCD_FRAME")
+while not ccd_frame:
+    time.sleep(0.5)
+    ccd_frame = device_ccd.getNumber("CCD_FRAME")
 
 blobEvent = threading.Event()
 
-making sure that the cooling temperature is reached before moving on to taking pictures
-while ccd_temperature[0].value > -9.5 :
-    print('waiting for cool')
-    print(ccd_temperature[0].value)
-    time.sleep(2)
+# making sure that the cooling temperature is reached before moving on to taking pictures
+# while ccd_temperature[0].value > -9.5 :
+#     print('waiting for cool')
+#     print(ccd_temperature[0].value)
+#     time.sleep(2)
 logging.info('Target temperature reached, camera ready')
     
 print('set up ok')
 
 def MagnitudeToExposure(magnitude):
     return EXPOSURE0 * ( 10**((MAGNITUDE0 - magnitude)/2.5) )
-
 
 ### GIVING NEW COORDINATES TO EXPLORE
 
@@ -395,7 +433,11 @@ def CapturePictures(star, exposures, message = ""):
 
     # taking the next pictures
     for i in range(len(exposures)):
-        blobEvent.wait()        # wait until the previous exposure is done
+        global flag
+        flag = blobEvent.wait(TIMEOUT)        # wait until the previous exposure is done
+        if not flag:
+            logging('Problem with camera - parking telescope and shutting down')
+            return 
         logging.info('New picture taken with exposure ' + str(exposures[i]) + ' s')
 
         # start the next exposure
@@ -428,13 +470,34 @@ def CapturePictures(star, exposures, message = ""):
     return paths
 
 
+def ReduceFrame(x, y, width, height, types):
+    if types == 'stream':
+        ccd_stream_frame[0].value = x
+        ccd_stream_frame[1].value = y
+        ccd_stream_frame[2].value = width
+        ccd_stream_frame[3].value = height
+        indiclient.sendNewNumber(ccd_stream_frame)
+        
+    elif types == 'picture':
+        ccd_frame[0].value = x
+        ccd_frame[1].value = y
+        ccd_frame[2].value = width
+        ccd_frame[3].value = height
+        indiclient.sendNewNumber(ccd_frame)
+
+    else:
+        logging.info('Reframing canceled')
+
 def CaptureStream(**star):
     global blobEvent
     blobEvent.clear()
 
     exposure = MagnitudeToExposure(star['mag'])
     duration = star['duration'] # duration in seconds (float)
-        
+    
+    # setting the frame of exposure
+#     ReduceFrame(X, Y, WIDTH, HEIGHT, 'stream')
+    
     # initiating the stream
     ccd_video_stream = device_ccd.getSwitch("CCD_VIDEO_STREAM")
     while not ccd_video_stream:
@@ -454,7 +517,11 @@ def CaptureStream(**star):
     ccd_streaming_exposure[0].value = exposure
     indiclient.sendNewNumber(ccd_streaming_exposure)
     print('waiting here')
-    blobEvent.wait()
+    global flag
+    flag = blobEvent.wait(TIMEOUT)        # wait until the previous exposure is done
+    if not flag:
+        logging('Problem with camera - parking telescope and shutting down')
+        return 
     
     print("stream ready")
     logging.info('Stream exposure set to ' + str(exposure))
@@ -553,6 +620,8 @@ def CalibrateTelescope(**star):
     # test picture
     exposure = MagnitudeToExposure(star['mag'])
     img_path = CapturePictures(star, [exposure], "foranalysis_")[0]
+    if not flag:
+        return 
     logging.info('Analysis picture captured')
     
     # analysis of the picture with astrometry.net
@@ -601,8 +670,12 @@ def CalibrateTelescope(**star):
         logging.info('No need to calibrate telescope')
     
     ## capturing the control image
+    # setting the frame of exposure
+#     ReduceFrame(X, Y, WIDTH, HEIGHT, 'stream')
     CapturePictures(star, [exposure], "control_")
     print('control image taken')
+    if not flag:
+        return
     logging.info('Control image captured')
   
   
@@ -640,6 +713,16 @@ def main(csv_filename = CSV_FILENAME, txt_filename = TXT_FILENAME):
         if not visible:
             print("star not visible")
             continue
+        if not flag:
+            # parking the telescope
+            telescope_park[0].s = PyIndi.ISS_ON
+            telescope_park[1].s = PyIndi.ISS_OFF
+            indiclient.sendNewSwitch(telescope_park)
+            while telescope_park.getState() == PyIndi.IPS_BUSY:
+                time.sleep(2)
+                print('Telescope parking')
+            logging.info("Telescope parked")
+            return
             
         # wait for the 'start' time to come to capture the stream
         logging.info('waiting for T' + ' - ' + str(DELAY) + 'seconds')        
@@ -665,26 +748,27 @@ def main(csv_filename = CSV_FILENAME, txt_filename = TXT_FILENAME):
         
     print("All tasks done, disconnecting server")
     
-main()
+# main()
 
-# turning cooling off
-ccd_cooler = device_ccd.getSwitch("CCD_COOLER")
-while not ccd_cooler:
-    time.sleep(0.5)
+if flag:
+    # turning cooling off
     ccd_cooler = device_ccd.getSwitch("CCD_COOLER")
-ccd_cooler[0].s = PyIndi.ISS_OFF
-ccd_cooler[1].s = PyIndi.ISS_ON
-indiclient.sendNewSwitch(ccd_cooler)
+    while not ccd_cooler:
+        time.sleep(0.5)
+        ccd_cooler = device_ccd.getSwitch("CCD_COOLER")
+    ccd_cooler[0].s = PyIndi.ISS_OFF
+    ccd_cooler[1].s = PyIndi.ISS_ON
+    indiclient.sendNewSwitch(ccd_cooler)
 
-# disconnecting the CCD
-ccd_connect = device_ccd.getSwitch("CONNECTION")
-while not ccd_connect :
-    time.sleep(0.5)
+    # disconnecting the CCD
     ccd_connect = device_ccd.getSwitch("CONNECTION")
-if not device_ccd.isConnected():
-    ccd_connect[0].s = PyIndi.ISS_OFF
-    ccd_connect[1].s = PyIndi.ISS_ON
-    indiclient.sendNewSwitch(ccd_connect)
+    while not ccd_connect :
+        time.sleep(0.5)
+        ccd_connect = device_ccd.getSwitch("CONNECTION")
+    if not device_ccd.isConnected():
+        ccd_connect[0].s = PyIndi.ISS_OFF
+        ccd_connect[1].s = PyIndi.ISS_ON
+        indiclient.sendNewSwitch(ccd_connect)
 
 # laisser allumer et changer la temp cible 
 

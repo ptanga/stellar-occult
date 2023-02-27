@@ -8,6 +8,13 @@ It uses INDI drivers and follows the INDI Protocol to control a mount and a CCD 
 source: https://www.frontiersin.org/articles/10.3389/fspas.2022.895732/full
 
 
+### Physical connections
+
+Before setting up the network and internal connections of the INDI Protocol, which are taken care of in the program, the physical connections must be established. In our installation, we use a RaspberryPi 4, a CCD camera, and a mount. The CCD camera and the telescope are connected to a hub, itself connected to the RaspberryPi, and powered by a battery. The RaspberryPi is also connected to a power source. The CCD camera we use has a GPS antenna, which is useful to get exact timestamps. The antenna is connected to the CCD camera. Below is how the installation looks like when operational. 
+
+<img width="700" src="https://user-images.githubusercontent.com/105792791/221595782-110f001b-c82d-4191-8409-f3ab34ce0668.jpg" alt="connections">
+
+
 ### Structure of the installation
 ![structure](https://user-images.githubusercontent.com/105792791/218798228-31a61e17-e6e3-4f57-b9dc-e143fa339678.jpg)
 

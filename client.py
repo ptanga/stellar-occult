@@ -35,8 +35,8 @@ import pandas as pd
 
 
 # Constants
-TELESCOPE_NAME = "SynScan"
-# TELESCOPE_NAME = "Telescope Simulator"
+# TELESCOPE_NAME = "SynScan"
+TELESCOPE_NAME = "Telescope Simulator"
 # CCD_NAME = "CCD Simulator"
 CCD_NAME = "QHY CCD QHY174M-7a6fbf4"
 
@@ -46,7 +46,7 @@ ELEVATION = 369.0
 NAME = "OCA"
 TIMEZONE = "Europe/Paris"
 OBSERVER = Observer(longitude=LONGITUDE*u.deg, latitude=LATITUDE*u.deg, elevation=ELEVATION*u.m, name = NAME, timezone=TIMEZONE)
-
+print(OBSERVER)
 CSV_FILENAME = 'all_coordinates_CSV.csv'
 TXT_FILENAME = 'all_coordinates_TXT.txt'
 
@@ -72,27 +72,27 @@ class IndiClient(PyIndi.BaseClient):
         pass
     
     def newProperty(self, p):
-        print("New ", p.getType(), " property ", p.getName(), " for device ", p.getDeviceName())
-        if p.getType()==PyIndi.INDI_SWITCH:
-            tpy=p.getSwitch()
-            for t in tpy:
-                print("       "+t.name+"("+t.label+")= ")
-        elif p.getType()==PyIndi.INDI_LIGHT:
-            tpy=p.getLight()
-            for t in tpy:
-                print("       "+t.name+"("+t.label+")= ")
-        elif p.getType()==PyIndi.INDI_TEXT:
-            tpy=p.getText()
-            for t in tpy:
-                print("       "+t.name+"("+t.label+")= "+t.text)
-        elif p.getType()==PyIndi.INDI_NUMBER:
-            tpy=p.getNumber()
-            for t in tpy:
-                print("       "+t.name+"("+t.label+")= "+str(t.value))
-        elif p.getType()==PyIndi.INDI_BLOB:
-            tpy=p.getBLOB()
-            for t in tpy:
-                print("       "+t.name+"("+t.label+")= <blob "+str(t.size)+" bytes>")
+#         print("New ", p.getType(), " property ", p.getName(), " for device ", p.getDeviceName())
+#         if p.getType()==PyIndi.INDI_SWITCH:
+#             tpy=p.getSwitch()
+#             for t in tpy:
+#                 print("       "+t.name+"("+t.label+")= ")
+#         elif p.getType()==PyIndi.INDI_LIGHT:
+#             tpy=p.getLight()
+#             for t in tpy:
+#                 print("       "+t.name+"("+t.label+")= ")
+#         elif p.getType()==PyIndi.INDI_TEXT:
+#             tpy=p.getText()
+#             for t in tpy:
+#                 print("       "+t.name+"("+t.label+")= "+t.text)
+#         elif p.getType()==PyIndi.INDI_NUMBER:
+#             tpy=p.getNumber()
+#             for t in tpy:
+#                 print("       "+t.name+"("+t.label+")= "+str(t.value))
+#         elif p.getType()==PyIndi.INDI_BLOB:
+#             tpy=p.getBLOB()
+#             for t in tpy:
+#                 print("       "+t.name+"("+t.label+")= <blob "+str(t.size)+" bytes>")
         pass
         
     def removeProperty(self, p):
@@ -227,13 +227,13 @@ ccd_temperature[0].value = -10
 indiclient.sendNewNumber(ccd_temperature)
 
 # switching the cooler on
-# ccd_cooler = device_ccd.getSwitch("CCD_COOLER")
-# while not ccd_cooler:
-#     time.sleep(0.5)
-#     ccd_cooler = device_ccd.getSwitch("CCD_COOLER")
-# ccd_cooler[0].s = PyIndi.ISS_ON       # this is the COOLER_ON switch
-# ccd_cooler[1].s = PyIndi.ISS_OFF      # this is the COOLER_OFF switch
-# indiclient.sendNewSwitch(ccd_cooler)
+ccd_cooler = device_ccd.getSwitch("CCD_COOLER")
+while not ccd_cooler:
+    time.sleep(0.5)
+    ccd_cooler = device_ccd.getSwitch("CCD_COOLER")
+ccd_cooler[0].s = PyIndi.ISS_ON       # this is the COOLER_ON switch
+ccd_cooler[1].s = PyIndi.ISS_OFF      # this is the COOLER_OFF switch
+indiclient.sendNewSwitch(ccd_cooler)
 
 logging.info('Camera is cooling down')
 
@@ -259,12 +259,14 @@ if usb_buffer[0].value != 2048:
     indiclient.sendNewNumber(usb_buffer)
 
 # making sure the resolution is 16bit
-ccd_bpp = device_ccd.getNumber("CCD_BITSPERPIXEL")
+ccd_bpp = device_ccd.getNumber("CCD_INFO")
 while not ccd_bpp:
     time.sleep(0.5)
-    ccd_bpp = device_ccd.getNumber("CCD_BITSPERPIXEL")
-ccd_bpp[0].value = 16
+    ccd_bpp = device_ccd.getNumber("CCD_INFO")
+    print('bpp')
+ccd_bpp[5].value = 16
 indiclient.sendNewNumber(ccd_bpp)
+print('usb done')
 
 
 # getting the GPS ready
@@ -326,6 +328,15 @@ while not gps_state:
 ccd_video_stream[0].s = PyIndi.ISS_OFF
 ccd_video_stream[1].s = PyIndi.ISS_ON
 indiclient.sendNewSwitch(ccd_video_stream)
+
+# gps_data_now = device_ccd.getText("GPS_DATA_NOW")
+while not gps_data_now:
+    time.sleep(0.5)
+    gps_data_now = device_ccd.getText("GPS_DATA_NOW")
+# os.popen('sudo date -s ' + str(gps_data_now[3].text))
+os.popen('sudo date -s ' + gps_data_now[3].text)
+logging.info('Raspberry Clock set to ' + gps_data_now[3].text + 'UTC')
+
 
 print("gps ok")
 logging.info('GPS locked')
@@ -626,7 +637,7 @@ def CalibrateTelescope(**star):
     
     # analysis of the picture with astrometry.net
     print('Analysing image')
-    reply = os.popen('solve-field --ra ' + str(star['ra']*360.0/24.0) + ' --dec ' + str(star['dec']) + ' --radius ' + RADIUS + ' ' + img_path + ' --overwrite')
+    reply = os.popen('solve-field --ra ' + str(star['ra']*360.0/24.0) + ' --dec ' + str(star['dec']) + ' --radius ' + str(RADIUS) + ' ' + img_path + ' --overwrite')
     output = reply.read()
     if "Field center: (RA,Dec)" in output :
         coordinates_str = output.split("Field center: (RA,Dec) = (",1)[1]
@@ -747,7 +758,7 @@ def main(csv_filename = CSV_FILENAME, txt_filename = TXT_FILENAME):
         print(telescope_track_state[0].s == PyIndi.ISS_ON)
         
     print("All tasks done, disconnecting server")
-    
+   
 # main()
 
 if flag:

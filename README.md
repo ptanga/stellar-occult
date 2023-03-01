@@ -25,18 +25,18 @@ Here is how the program works.
 1. initialization of the indi server and the indiclient
 2. setup of the devices and their properties
 3. running of the main function (which loops for each star entry in the input file):
-    - pointing of the telescope (target acqusition)
-    	- control of the star's visibility
-	- slew of the telescope
-     	- control of the telescope's accuracy
-		- acquisition of a control image 
-		- solution of the image
-		- correction of pointing if required
-     	- capture of a reference picture
-    - capture of a stream
-     	 - setup of the stream parameters
-     	 - recording of the telescope
-    - parking of the telescope
+	- pointing of the telescope (target acqusition)
+		- control of the star's visibility
+		- slew of the telescope
+		- control of the telescope's accuracy
+			- acquisition of a control image 
+			- solution of the image
+			- correction of pointing if required
+		- capture of a reference picture
+	- capture of a stream
+		- setup of the stream parameters
+		- recording of the telescope
+	- parking of the telescope
 4. disconnection of the devices 
 5. termination of the server
 

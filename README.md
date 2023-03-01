@@ -10,7 +10,7 @@ source: https://www.frontiersin.org/articles/10.3389/fspas.2022.895732/full
 
 ### Physical connections
 
-Before setting up the network and internal connections of the INDI Protocol, which are taken care of in the program, the physical connections must be established. In our installation, we use a RaspberryPi 4, a CCD camera, and a mount. The CCD camera and the telescope are connected to a hub, itself connected to the RaspberryPi, and powered by a battery. The RaspberryPi is also connected to a power source. The CCD camera we use has a GPS antenna, which is useful to get exact timestamps. The antenna is connected to the CCD camera. Below is how the installation looks like when operational. 
+Before setting up the network and internal connections of the INDI Protocol, which are taken care of in the program, the physical connections must be established. In our installation, we use a RaspberryPi 4, a CCD camera, and a mount. The CCD camera and the telescope are connected to a USB hub, itself connected to the RaspberryPi, and powered by a battery. The RaspberryPi is also connected to a power source. The CCD camera we use (a QHY174-GPS) has a GPS antenna, which is useful to get exact timestamps. The antenna is connected to the CCD camera. Below is how the installation looks like when operational. 
 
 <img width="700" src="https://user-images.githubusercontent.com/105792791/221595782-110f001b-c82d-4191-8409-f3ab34ce0668.jpg" alt="connections">
 
@@ -19,15 +19,20 @@ Before setting up the network and internal connections of the INDI Protocol, whi
 ![structure](https://user-images.githubusercontent.com/105792791/218798228-31a61e17-e6e3-4f57-b9dc-e143fa339678.jpg)
 
 
+The sequence of observations is read at the beginning of the program from a file that contains the coordinates of the target stars, the epoch of their occultations, and their magnitude. Each star is a line in the input file, which is then explored line by line (i.e. star by star). 
 Here is how the program works.
 
 1. initialization of the indi server and the indiclient
 2. setup of the devices and their properties
-3. running of the main function :
-    - calibration of the telescope
+3. running of the main function (which loops for each star entry in the input file):
+    - pointing of the telescope (target acqusition)
     	- control of the star's visibility
+	- slew of the telescope
      	- control of the telescope's accuracy
-     	- capture of a control picture
+		- acquisition of a control image 
+		- solution of the image
+		- correction of pointing if required
+     	- capture of a reference picture
     - capture of a stream
      	 - setup of the stream parameters
      	 - recording of the telescope
@@ -130,7 +135,7 @@ TELESCOPE_NAME = "Synscan"
 CCD_NAME = "QHY CCD QHY174M-7a6fbf4"
 ```
 
-  Another set of constants that will probably need to be changed is that of the coordinates of the telescope. In this case, the telescope is located at the OCA, so the constants LATITUDE, LONGITUDE and ELEVATION correspond to the observatory. The OBSERVER constant uses astroplan to create an Observer instance corresponding to the location of the telescope.
+  Another set of constants that will probably need to be changed is that of the coordinates of the telescope. In this example, the telescope is located at the Observatoire de la Cote d'Azur (France), so the constants LATITUDE, LONGITUDE and ELEVATION correspond to the observatory. The OBSERVER constant uses astroplan to create an Observer instance corresponding to the location of the telescope.
   
 ```
 LATITUDE = 43.78944444
@@ -148,7 +153,7 @@ CSV_FILENAME = 'all_coordinates_CSV.csv'
 TXT_FILENAME = 'all_coordinates_TXT.txt'
 ```
 
-The DELAY constant corresponds to the number of seconds prior to the start time given in the CSV file at which to start the calibration of the telescope. For example, here, the calibration of the telescope will start 5 minutes (300 seconds) before the time at which we want to start recording the stream. Finally, the RADIUS constant corresponds to the radius entered during the astrometry.net search, which is the radius from the given coordinates for it to look for known recognizable stars. 
+The DELAY constant corresponds to the number of seconds prior to the start time given in the CSV file at which to start the target acqusition. For example, here, the target acquisition will start 5 minutes (300 seconds) before the time at which we want to start recording the stream. Finally, the RADIUS constant corresponds to the radius entered during the astrometry.net search, which is the radius from the given coordinates for it to look for known recognizable stars. 
 
 ```
 DELAY = 300 # number of seconds to start-time to start calibrating
@@ -160,11 +165,11 @@ RADIUS = 10 # radius given to astrometry.net search
   The main function is the function that will trigger the pictures and streams of a chosen star at a chosen time. It takes in argument a CSV file containing information on stars to captured and when and how to capture them (see [example](https://github.com/jdescloitres/stellar-occult/blob/main/all_coordinates_CSV_example.csv)). This CSV file changes every night. Each line of the file represents a star. To simplify the code, this content of the CSV file is then represented as dictionnaries in a TXT file (see CSV_TO_TXT).
 
 The main function is divided in three parts for each star:
-- calibration of the telescope
+- telescope pointing (target acqusisition)
 - capture of the stream
 - parking the telescope before next star
 
-The calibration of the telescope and the capture of the stream are set to start respectively five minutes (see value of DELAY) before and at the time given in the text file, with the help of the scheduler function. 
+The telescope pointing and the capture of the stream are set to start respectively five minutes (see value of DELAY) before and at the time given in the text file, with the help of the scheduler function. 
 
 ```
 s = sched.scheduler(time.time)
@@ -174,9 +179,9 @@ s.run()
 
 The telescope is parked once the stream recording has ended.
 
-## 1. calibration of the telescope
+## 1. telescope pointing (target acqusisition)
 	
-The calibration itself is divided into three (or four) parts (see Figure):
+The pointing itself is divided into three (or four) parts (see Figure):
 - making sure the star is visible
 - making sure the telescope is pointing in the correct direction
 - (and recalibrating it if not)
@@ -190,7 +195,7 @@ target = FixedTarget(coord = star_coord)
 time = Time(datetime.now())
 h = OCA.altaz(time, target).alt		# h is the current altitude of the star
 ```
-  If the star is not yet visible, the program will stop the calibration and move on to the next target in the text file.
+  If the star is not yet visible, the program will stop the pointing and move on to the next target in the text file.
   If the star is visible, however, the program carries on with the next step: checking the accuracy of the telescope's coordinates. The coordinates of the star are given to the telescope for it to move to them. Once the telescope is locked on a direction (and tracking it), a picture is captured. This picture is then analyzed by astrometry.net, which will return (if the stars are recognizable) the actual coordinates of the portion of the sky the telescope is pointing to. 
   
 ``` 
@@ -208,8 +213,8 @@ else :
 	delta0 = star['dec']*24.0/360.0
 ```
 
-  If the difference - between the coordinates given to the telescope and the actual ones returned by astrometry.net - is small enough, the telescope is considered already calibrated. 
-  If not, the telescope is then synced to the coordinates returned by astrometry.net
+  If the difference - between the coordinates given to the telescope and the actual ones returned by astrometry.net - is small enough, the telescope pointing is considered to be correct. 
+  If not, a second the telescope is then synced to the coordinates returned by astrometry.net, and a second telescope move is requested, so that the pointing is corrected accordingly.
 	
   In any case, the program then moves on to capturing a picture of the sky, which will serve as a control image.
 
@@ -253,6 +258,7 @@ The function returns a list of the names of the paths. The use of this function 
  ## 3. MagnitudeToExposure
 	
   The aim of this function is to give an equivalent of exposure for magnitude given, in a way that the relation between magnitude and exposure is the same for every star (no matter the magnitude).
+  The current form is very simple and may require accurate tuning and a more complex calibration (for example, by adjusting the gain), depending on the telescope that is used. 
 
 
 # IV/ Terminating the program

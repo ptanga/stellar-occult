@@ -12,8 +12,7 @@ source: https://www.frontiersin.org/articles/10.3389/fspas.2022.895732/full
 
 Before setting up the network and internal connections of the INDI Protocol, which are taken care of in the program, the physical connections must be established. In our installation, we use a RaspberryPi 4, a CCD camera, and a mount. The CCD camera and the telescope are connected to a USB hub, itself connected to the RaspberryPi, and powered by a battery. The RaspberryPi is also connected to a power source. The CCD camera we use (a QHY174-GPS) has a GPS antenna, which is useful to get exact timestamps. The antenna is connected to the CCD camera. Below is how the installation looks like when operational. 
 
-<img width="700" src="https://user-images.githubusercontent.com/105792791/221595782-110f001b-c82d-4191-8409-f3ab34ce0668.jpg" alt="connections">
-
+<img width="700" src="https://user-images.githubusercontent.com/105792791/223458161-dccfcd10-4daa-4609-9ff6-b1c20f4a869a.jpg" alt="connections">
 
 ### Structure of the installation
 ![structure](https://user-images.githubusercontent.com/105792791/218798228-31a61e17-e6e3-4f57-b9dc-e143fa339678.jpg)
@@ -49,6 +48,10 @@ Here is how the program works.
   To initialize the server, the command 'indiserver' has to be run in a terminal, followed by the initialization of the devices that we want to control. In this case, we are using a QHY CCD camera, and a SynScan telescope, so the full command to run is as follows:
   
 ``` indiserver -v indi_qhy_ccd indi_synscan_telescope ```
+
+  That command can also be run directly from the python script with os.popen:
+  
+``` os.popen('indiserver indi_qhy_ccd indi_synscan_telescope') ```
 
   To initialize the client, we need to create a subclass to the original INDI class responsible for creating clients : BaseClient. The subclass (called IndiClient) inherits the properties and methods of BaseClient (e.g. *newDevice()* etc). None of the methods need to be overridden in theory, but overriding the *newBLOB()* method enables the use of Python module threading, which will prove useful to be able to continue capturing new data while processing data that has just been captured. The *newProperty()* method can also be overridden to display all properties for all devices (see [commented lines](https://github.com/jdescloitres/stellar-occult/blob/8d35b0a24db68d4415e321e34fa352013d766600/client.py#L56) in client.py). 
   
@@ -173,7 +176,7 @@ The telescope pointing and the capture of the stream are set to start respective
 
 ```
 s = sched.scheduler(time.time)
-s.enterabs(star['start'] - DELAY, 1, CalibrateTelescope, kwargs = (star))
+s.enterabs(star['epoch'] - star['duration']/2 - DELAY, 1, CalibrateTelescope, kwargs = (star))
 s.run()
 ```
 
@@ -190,7 +193,7 @@ The pointing itself is divided into three (or four) parts (see Figure):
  The first step to calibrating the telescope is making sure the star we are directing it to is in fact visible at this time of night. To do so, we are using the astroplan library, and giving it the scope's coordinates on Earth, the coordinates of the target (star), and the time.
  
 ```
-star_coord = SkyCoord(ra = star['ra']*u.deg, dec = star['dec']*u.deg)
+star_coord = SkyCoord(ra = star['ra']*u.hourangle, dec = star['dec']*u.deg)
 target = FixedTarget(coord = star_coord)
 time = Time(datetime.now())
 h = OCA.altaz(time, target).alt		# h is the current altitude of the star
@@ -205,12 +208,12 @@ if "Field center: (RA,Dec)" in output :
 	coordinates_str = output.split("Field center: (RA,Dec) = (",1)[1]
 	coordinates_cpl = coordinates_str.split(")")[0]
 	alpha0 = float(coordinates_cpl.split(", ")[0]) * 24.0/360.0
-	delta0 = float(coordinates_cpl.split(", ")[1]) * 24.0/360.0
+	delta0 = float(coordinates_cpl.split(", ")[1])
 	logging.info('Stars recognized, coordinates found are (' + str(alpha0) + ', ' + str(delta0) + ')')
 else :
 	print("Stars are not recognizable - ignoring calibration")
 	alpha0 = star['ra']
-	delta0 = star['dec']*24.0/360.0
+	delta0 = star['dec']
 ```
 
   If the difference - between the coordinates given to the telescope and the actual ones returned by astrometry.net - is small enough, the telescope pointing is considered to be correct. 

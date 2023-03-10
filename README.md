@@ -136,6 +136,7 @@ indiclient.sendNewNumber(ccd_temperature)
 ``` 
 TELESCOPE_NAME = "Synscan"
 CCD_NAME = "QHY CCD QHY174M-7a6fbf4"
+PPBA_NAME = "Pegasus PPBA"
 ```
 
   Another set of constants that will probably need to be changed is that of the coordinates of the telescope. In this example, the telescope is located at the Observatoire de la Cote d'Azur (France), so the constants LATITUDE, LONGITUDE and ELEVATION correspond to the observatory. The OBSERVER constant uses astroplan to create an Observer instance corresponding to the location of the telescope.
@@ -149,18 +150,29 @@ TIMEZONE = "Europe/Paris"
 OBSERVER = Observer(longitude=LONGITUDE*u.deg, latitude=LATITUDE*u.deg, elevation=ELEVATION*u.m, name=NAME, timezone=TIMEZONE)
 ```
 
-  Next, the names of the files on which the coordinates are written can be changed. CSV_FILENAME is the name of the already existing CSV file giving the program the coordinates of the stars to observe, and TXT_FILENAME is the name of the TXT file that will be created within the program. 
+  Next, the names of the files on which the coordinates are written can be changed. CSV_FILENAME is the name of the already existing CSV file giving the program the coordinates of the stars to observe for that particular night, and TXT_FILENAME is the name of the TXT file that will be created within the program. 
   
 ```
-CSV_FILENAME = 'all_coordinates_CSV.csv'
+CSV_FILENAME = 'all_coordinates_' + datetime.now().strftime("%Y_%m_%d") + '.csv'
 TXT_FILENAME = 'all_coordinates_TXT.txt'
 ```
 
-The DELAY constant corresponds to the number of seconds prior to the start time given in the CSV file at which to start the target acqusition. For example, here, the target acquisition will start 5 minutes (300 seconds) before the time at which we want to start recording the stream. Finally, the RADIUS constant corresponds to the radius entered during the astrometry.net search, which is the radius from the given coordinates for it to look for known recognizable stars. 
+The DELAY constant corresponds to the number of seconds prior to the start time given in the CSV file at which to start the target acqusition. For example, here, the target acquisition will start 5 minutes (300 seconds) before the time at which we want to start recording the stream. The RADIUS constant corresponds to the radius entered during the astrometry.net search, which is the radius from the given coordinates for it to look for known recognizable stars. 
+The TIMEOUT constant will intervene when waiting for the camera to finish the acqusition: if it takes longer than TIMEOUT, it will be supposed that there is a problem with the connection of the camera. 
+RA_PARK and DEC_PARK are respectively the right ascension and declination that we might want to set the park position to. 
+MAGNITUDE0 and EXPOSURE0 are the reference for exposure: for a star of magnitude MAGNITUDE0, the exposure of the camera will be set to EXPOSURE0. With those two constants, equivalent exposures are calculated in the MagnitudeToExposure function for other magnitudes. 
+Finally, the MAX_HUMIDITY constant is the limit percentage of humidity in the air that is acceptable for the telescope and camera to be exposed to. 
 
 ```
 DELAY = 300 # number of seconds to start-time to start calibrating
 RADIUS = 10 # radius given to astrometry.net search
+TIMEOUT = 60 # number of seconds until camera is considered not working
+
+RA_PARK = 179
+DEC_PARK = 1
+MAGNITUDE0 = 9
+EXPOSURE0 = 0.05 # an exposure of EXPOSURE0 for a star of magnitude MAGNITUDE0 will set the equivalent for other magnitudes
+MAX_HUMIDITY = 0.95
 ```
 
 # II/ The main function

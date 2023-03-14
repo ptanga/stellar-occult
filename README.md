@@ -175,7 +175,7 @@ EXPOSURE0 = 0.05 # an exposure of EXPOSURE0 for a star of magnitude MAGNITUDE0 w
 MAX_HUMIDITY = 0.95
 ```
 
-# II/ The main function
+# II/ The main() function
 
   The main function is the function that will trigger the pictures and streams of a chosen star at a chosen time. It takes in argument a CSV file containing information on stars to captured and when and how to capture them (see [example](https://github.com/jdescloitres/stellar-occult/blob/main/all_coordinates_CSV_example.csv)). This CSV file changes every night. Each line of the file represents a star. To simplify the code, this content of the CSV file is then represented as dictionnaries in a TXT file (see CSV_TO_TXT).
 
@@ -261,16 +261,16 @@ print('Telescope parked')
 
 
 # III/ Details for secondary functions
- ## 1. EnterNewCoordinates
+ ## 1. EnterNewCoordinates()
 	
   This function gives the telescope new equatorial coordinates to track, and waits for it to be locked on its new position (by interrogating the state of the property and waiting until it is not BUSY anymore).
 	
- ## 2. CapturePictures
+ ## 2. CapturePictures()
 	
   This function takes in argument a star and a list of exposures to capture the star with. For every given exposure, the program will wait for the previous picture to have been captured before taking a new one, while the first one is being processed and saved to a fits file, the name of which contains information on the star itself and the time of the capture. All pictures are saved into a folder named with the current date. 
 The function returns a list of the names of the paths. The use of this function in the main function is restricted to one exposure each time it is called, and the path returned is used for astrometry.net.
 	
- ## 3. MagnitudeToExposure
+ ## 3. MagnitudeToExposure()
 	
   The aim of this function is to give an equivalent of exposure for magnitude given, in a way that the relation between magnitude and exposure is the same for every star (no matter the magnitude).
   The current form is very simple and may require accurate tuning and a more complex calibration (for example, by adjusting the gain), depending on the telescope that is used. 

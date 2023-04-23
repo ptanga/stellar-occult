@@ -40,8 +40,10 @@ logging.basicConfig(filename = directory + logname,
                     datefmt = '%H:%M:%S',
                     level = logging.DEBUG)
 
+print('Logs in file named ' + logname)
+
 ## connecting the indiserver
-os.popen('indiserver indi_simulator_ccd indi_simulator_telescope')
+os.popen('indiserver indi_qhy_ccd indi_synscan_telescope indi_pegasus_ppba')
 
 # Constants
 TELESCOPE_NAME = "SynScan"
@@ -56,12 +58,10 @@ ELEVATION = 369.0
 NAME = "OCA"
 TIMEZONE = "Europe/Paris"
 OBSERVER = Observer(longitude=LONGITUDE*u.deg, latitude=LATITUDE*u.deg, elevation=ELEVATION*u.m, name = NAME, timezone=TIMEZONE)
-CSV_FILENAME = 'all_coordinates_' + datetime.now().strftime("%Y_%m_%d") + '.csv'
-TXT_FILENAME = 'all_coordinates_TXT.txt'
 
 RA_PARK = 179
 DEC_PARK = 1
-DELAY = 300 # number of seconds to epoch to start target acquisition
+DELAY = 60 # number of seconds to epoch to start target acquisition
 TIMEOUT = 60 # number of seconds until camera is considered not working
 RADIUS = 10 # radius given to astrometry.net search
 MAGNITUDE0 = 9
@@ -219,10 +219,10 @@ if not device_ppba.isConnected():
 print('USB hub connected')
 logging.info('USB hub connected')
 
-ppba_humidity = device_ppba.getNumber("HUMIDITY")
-while not ppba_humidity:
-    time.sleep(0.5)
-    ppba_humidity = device_ppba.getNumber("HUMIDITY")
+# ppba_humidity = device_ppba.getNumber("HUMIDITY")
+# while not ppba_humidity:
+#     time.sleep(0.5)
+#     ppba_humidity = device_ppba.getNumber("HUMIDITY")
 
 # connecting the CCD
 ccd = CCD_NAME
@@ -264,13 +264,13 @@ ccd_temperature[0].value = -10
 indiclient.sendNewNumber(ccd_temperature)
 
 # switching the cooler on
-ccd_cooler = device_ccd.getSwitch("CCD_COOLER")
-while not ccd_cooler:
-    time.sleep(0.5)
-    ccd_cooler = device_ccd.getSwitch("CCD_COOLER")
-ccd_cooler[0].s = PyIndi.ISS_ON       # this is the COOLER_ON switch
-ccd_cooler[1].s = PyIndi.ISS_OFF      # this is the COOLER_OFF switch
-indiclient.sendNewSwitch(ccd_cooler)
+# ccd_cooler = device_ccd.getSwitch("CCD_COOLER")
+# while not ccd_cooler:
+#     time.sleep(0.5)
+#     ccd_cooler = device_ccd.getSwitch("CCD_COOLER")
+# ccd_cooler[0].s = PyIndi.ISS_ON       # this is the COOLER_ON switch
+# ccd_cooler[1].s = PyIndi.ISS_OFF      # this is the COOLER_OFF switch
+# indiclient.sendNewSwitch(ccd_cooler)
 
 logging.info('Camera is cooling down')
 
@@ -357,7 +357,7 @@ gps_state = device_ccd.getLight("GPS_STATE")
 while not gps_state:
     time.sleep(0.5)
     gps_state = device_ccd.getLight("GPS_STATE")
-# while not (gps_state[0].s == PyIndi.IPS_IDLE and gps_state[1].s == PyIndi.IPS_IDLE and gps_state[2].s == PyIndi.IPS_IDLE and gps_state[3].s == PyIndi.IPS_BUSY) : # these are the POWERED, SEARCHING, LOCKING, LOCKED lights
+while not (gps_state[0].s == PyIndi.IPS_IDLE and gps_state[1].s == PyIndi.IPS_IDLE and gps_state[2].s == PyIndi.IPS_IDLE and gps_state[3].s == PyIndi.IPS_BUSY) : # these are the POWERED, SEARCHING, LOCKING, LOCKED lights
     time.sleep(1)
     print(gps_state[0].s, gps_state[1].s, gps_state[2].s, gps_state[3].s)
 
@@ -435,11 +435,11 @@ while not ccd_frame:
 blobEvent = threading.Event()
 
 # making sure that the cooling temperature is reached before moving on to taking pictures
-while ccd_temperature[0].value > -9.5 :
-    print('waiting for cool')
-    print(ccd_temperature[0].value)
-    time.sleep(2)
-logging.info('Target temperature reached, camera ready')
+# while ccd_temperature[0].value > -9.5 :
+#     print('waiting for cool')
+#     print(ccd_temperature[0].value)
+#     time.sleep(2)
+# logging.info('Target temperature reached, camera ready')
     
 print('set up ok')
 
@@ -455,6 +455,7 @@ def EnterNewCoordinates(star):
     # the EQUATORIAL_EOD_COORD property is a vector composed of 2 values in the following order : RA in decimal hours, DEC in degrees (cf Standard Properties)
     telescope_radec[0].value = star['ra']
     telescope_radec[1].value = star['dec']
+    print(telescope_radec[0], telescope_radec[1])
     indiclient.sendNewNumber(telescope_radec)
     logging.info('Telescope moving to RA ' + str(star['ra']) + ' DEC ' + str(star['dec']))
 
@@ -624,22 +625,22 @@ def CalibrateTelescope(**star):
     print("Target acquisition starting")
     
     ## checking if the star is visible with astroplan
-    star_coord = SkyCoord(ra = star['ra']*u.hourangle, dec = star['dec']*u.deg)
-    target = FixedTarget(coord = star_coord)
-    time = Time(datetime.now())
-    h = OBSERVER.altaz(time, target).alt
-    global visible
-    if h.dms[0] < 10 :
-        visible = True
-        print(h.dms[0])
-        print("ERROR : star not visible, check epoch")
-        print("Moving on to next star")
-        logging.warning('ERROR : star not visible, check epoch -- Moving on to next star')
-        return
-    else:
-        print(h.dms[0])
-        visible = True
-        logging.info('Star visible')
+#     star_coord = SkyCoord(ra = star['ra']*u.hourangle, dec = star['dec']*u.deg)
+#     target = FixedTarget(coord = star_coord)
+#     time = Time(datetime.now())
+#     h = OBSERVER.altaz(time, target).alt
+#     global visible
+#     if h.dms[0] < 10 :
+#         visible = True
+#         print(h.dms[0])
+#         print("ERROR : star not visible, check epoch")
+#         print("Moving on to next star")
+#         logging.warning('ERROR : star not visible, check epoch -- Moving on to next star')
+#         return
+#     else:
+#         print(h.dms[0])
+#         visible = True
+#         logging.info('Star visible')
     
     # pointing to star
     if telescope_park[0].s == PyIndi.ISS_ON :
@@ -668,48 +669,48 @@ def CalibrateTelescope(**star):
     
     # analysis of the picture with astrometry.net
     print('Analysing image')
-    reply = os.popen('solve-field --ra ' + str(star['ra']*360.0/24.0) + ' --dec ' + str(star['dec']) + ' --radius ' + str(RADIUS) + ' ' + img_path + ' --overwrite')
-    output = reply.read()      # the ra and dec given in the output are both given in degrees
-    if "Field center: (RA,Dec)" in output :
-        coordinates_str = output.split("Field center: (RA,Dec) = (",1)[1]
-        coordinates_cpl = coordinates_str.split(")")[0]
-        alpha0 = float(coordinates_cpl.split(", ")[0]) * 24.0/360.0    # alpha0 is now in hour angle
-        delta0 = float(coordinates_cpl.split(", ")[1])                 # delta0 is already in degrees
-        logging.info('Stars recognized, coordinates found are (' + str(alpha0) + ', ' + str(delta0) + ')')
-    else :
-        print("Stars are not recognizable - ignoring target acquisition")
-        logging.warning('Stars are not recognizable - ignoring target acquisition')
-        alpha0 = star['ra']     # this is already in hour angle
-        delta0 = star['dec']    # this is already in degrees
+#     reply = os.popen('solve-field --ra ' + str(star['ra']*360.0/24.0) + ' --dec ' + str(star['dec']) + ' --radius ' + str(RADIUS) + ' ' + img_path + ' --overwrite')
+#     output = reply.read()      # the ra and dec given in the output are both given in degrees
+#     if "Field center: (RA,Dec)" in output :
+#         coordinates_str = output.split("Field center: (RA,Dec) = (",1)[1]
+#         coordinates_cpl = coordinates_str.split(")")[0]
+#         alpha0 = float(coordinates_cpl.split(", ")[0]) * 24.0/360.0    # alpha0 is now in hour angle
+#         delta0 = float(coordinates_cpl.split(", ")[1])                 # delta0 is already in degrees
+#         logging.info('Stars recognized, coordinates found are (' + str(alpha0) + ', ' + str(delta0) + ')')
+#     else :
+#         print("Stars are not recognizable - ignoring target acquisition")
+#         logging.warning('Stars are not recognizable - ignoring target acquisition')
+#         alpha0 = star['ra']     # this is already in hour angle
+#         delta0 = star['dec']    # this is already in degrees
     
     # evaluating the error
-    if abs(star['ra'] - alpha0) > 2 * 1/900 or abs(star['dec'] - delta0) > 2 * 1/60 :  # 2 arcmin = 2/60 degrees = 2*1/900 hour agnles
-        print("Correcting telescope pointing...")
-        logging.info('Correcting telescope pointing to (' + str(alpha0) + ', ' + str(delta0) + ')')
-        
-        # turning SYNC mode on
-        telescope_on_coord_set[0].s = PyIndi.ISS_ON # this is the SLEW switch
-        telescope_on_coord_set[1].s = PyIndi.ISS_OFF # this is the TRACK switch
-        telescope_on_coord_set[2].s = PyIndi.ISS_ON  # this is the SYNC switch, which we want to activate to calibrate the telescope
-        indiclient.sendNewSwitch(telescope_on_coord_set)
-        
-        # syncing the telescope and its actual coordinates
-        EnterNewCoordinates({'ra' : alpha0, 'dec' : delta0}) # since the option chosen is SYNC, this will not make the telescope move but simply understand where it is
-        
-        # going back to TRACK mode
-        telescope_on_coord_set[0].s = PyIndi.ISS_ON   # this is the SLEW switch
-        telescope_on_coord_set[1].s = PyIndi.ISS_OFF  # this is the TRACK switch, which we want to activate
-        telescope_on_coord_set[2].s = PyIndi.ISS_OFF  # this is the SYNC switch
-        indiclient.sendNewSwitch(telescope_on_coord_set)
-        print("Teslecope pointing is accurate")
-        logging.info('Telescope pointing is accurate')
-        
-        # second time pointing to the star
-        EnterNewCoordinates(star)    
-    
-    else :
-        print('telescope already pointing accurately')
-        logging.info('No need to correct telescope pointing')
+#     if abs(star['ra'] - alpha0) > 2 * 1/900 or abs(star['dec'] - delta0) > 2 * 1/60 :  # 2 arcmin = 2/60 degrees = 2*1/900 hour agnles
+#         print("Correcting telescope pointing...")
+#         logging.info('Correcting telescope pointing to (' + str(alpha0) + ', ' + str(delta0) + ')')
+#         
+#         # turning SYNC mode on
+#         telescope_on_coord_set[0].s = PyIndi.ISS_ON # this is the SLEW switch
+#         telescope_on_coord_set[1].s = PyIndi.ISS_OFF # this is the TRACK switch
+#         telescope_on_coord_set[2].s = PyIndi.ISS_ON  # this is the SYNC switch, which we want to activate to calibrate the telescope
+#         indiclient.sendNewSwitch(telescope_on_coord_set)
+#         
+#         # syncing the telescope and its actual coordinates
+#         EnterNewCoordinates({'ra' : alpha0, 'dec' : delta0}) # since the option chosen is SYNC, this will not make the telescope move but simply understand where it is
+#         
+#         # going back to TRACK mode
+#         telescope_on_coord_set[0].s = PyIndi.ISS_ON   # this is the SLEW switch
+#         telescope_on_coord_set[1].s = PyIndi.ISS_OFF  # this is the TRACK switch, which we want to activate
+#         telescope_on_coord_set[2].s = PyIndi.ISS_OFF  # this is the SYNC switch
+#         indiclient.sendNewSwitch(telescope_on_coord_set)
+#         print("Teslecope pointing is accurate")
+#         logging.info('Telescope pointing is accurate')
+#         
+#         # second time pointing to the star
+#         EnterNewCoordinates(star)    
+#     
+#     else :
+#         print('telescope already pointing accurately')
+#         logging.info('No need to correct telescope pointing')
     
     ## capturing the control image
     # setting the frame of exposure
@@ -760,6 +761,9 @@ def TXT_to_dicts(txt_filename):
     return stars
 
 
+CSV_FILENAME = '/home/pi/CSVFiles/all_coordinates_' + datetime.now().strftime("%Y_%m_%d") + '.csv'
+TXT_FILENAME = 'all_coordinates_' + datetime.now().strftime("%Y_%m_%d") + '.txt'
+
 def main(csv_filename = CSV_FILENAME, txt_filename = TXT_FILENAME):
     CSV_to_TXT(csv_filename, txt_filename)
     stars = TXT_to_dicts(txt_filename)
@@ -767,12 +771,12 @@ def main(csv_filename = CSV_FILENAME, txt_filename = TXT_FILENAME):
     for star in stars:
         logging.info('Star parameters: ' + str(star))
         
-        if ppba_humidity[0].value >= MAX_HUMIDITY:
-            time.sleep(60)
+#         if ppba_humidity[0].value >= MAX_HUMIDITY:
+#             time.sleep(60)
 
         # wait for five minutes to 'epoch' before target aquisition
-        if star['epoch'] - star['duration']/2 >= time.time():
-            continue
+       # if star['epoch'] - star['duration']/2 >= time.time():
+            #continue
         print("waiting for ", star['epoch'] - star['duration']/2, " - " + str(DELAY) + "seconds")
         logging.info('waiting for T' + ' - ' + str(DELAY) + 'seconds')
         s = sched.scheduler(time.time)
@@ -851,6 +855,10 @@ if device_telescope.isConnected():
     indiclient.sendNewSwitch(telescope_connect)
 
 indiclient.disconnectServer()
+
+#
+if log file not in directory:
+    move le ligfile dans directory
 
 # killing the indiserver
 os.popen('touch /tmp/noindi')

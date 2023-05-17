@@ -12,8 +12,7 @@ source: https://www.frontiersin.org/articles/10.3389/fspas.2022.895732/full
 
 Before setting up the network and internal connections of the INDI Protocol, which are taken care of in the program, the physical connections must be established. In our installation, we use a RaspberryPi 4, a CCD camera, and a mount. The CCD camera and the telescope are connected to a USB hub, itself connected to the RaspberryPi, and powered by a battery. The RaspberryPi is also connected to a power source. The CCD camera we use (a QHY174-GPS) has a GPS antenna, which is useful to get exact timestamps. The antenna is connected to the CCD camera. Below is how the installation looks like when operational. 
 
-<img width="700" src="https://user-images.githubusercontent.com/105792791/221595782-110f001b-c82d-4191-8409-f3ab34ce0668.jpg" alt="connections">
-
+<img width="700" src="https://user-images.githubusercontent.com/105792791/223458161-dccfcd10-4daa-4609-9ff6-b1c20f4a869a.jpg" alt="connections">
 
 ### Structure of the installation
 ![structure](https://user-images.githubusercontent.com/105792791/218798228-31a61e17-e6e3-4f57-b9dc-e143fa339678.jpg)
@@ -49,6 +48,10 @@ Here is how the program works.
   To initialize the server, the command 'indiserver' has to be run in a terminal, followed by the initialization of the devices that we want to control. In this case, we are using a QHY CCD camera, and a SynScan telescope, so the full command to run is as follows:
   
 ``` indiserver -v indi_qhy_ccd indi_synscan_telescope ```
+
+  That command can also be run directly from the python script with os.popen:
+  
+``` os.popen('indiserver indi_qhy_ccd indi_synscan_telescope') ```
 
   To initialize the client, we need to create a subclass to the original INDI class responsible for creating clients : BaseClient. The subclass (called IndiClient) inherits the properties and methods of BaseClient (e.g. *newDevice()* etc). None of the methods need to be overridden in theory, but overriding the *newBLOB()* method enables the use of Python module threading, which will prove useful to be able to continue capturing new data while processing data that has just been captured. The *newProperty()* method can also be overridden to display all properties for all devices (see [commented lines](https://github.com/jdescloitres/stellar-occult/blob/8d35b0a24db68d4415e321e34fa352013d766600/client.py#L56) in client.py). 
   
@@ -133,6 +136,7 @@ indiclient.sendNewNumber(ccd_temperature)
 ``` 
 TELESCOPE_NAME = "Synscan"
 CCD_NAME = "QHY CCD QHY174M-7a6fbf4"
+PPBA_NAME = "Pegasus PPBA"
 ```
 
   Another set of constants that will probably need to be changed is that of the coordinates of the telescope. In this example, the telescope is located at the Observatoire de la Cote d'Azur (France), so the constants LATITUDE, LONGITUDE and ELEVATION correspond to the observatory. The OBSERVER constant uses astroplan to create an Observer instance corresponding to the location of the telescope.
@@ -146,21 +150,32 @@ TIMEZONE = "Europe/Paris"
 OBSERVER = Observer(longitude=LONGITUDE*u.deg, latitude=LATITUDE*u.deg, elevation=ELEVATION*u.m, name=NAME, timezone=TIMEZONE)
 ```
 
-  Next, the names of the files on which the coordinates are written can be changed. CSV_FILENAME is the name of the already existing CSV file giving the program the coordinates of the stars to observe, and TXT_FILENAME is the name of the TXT file that will be created within the program. 
+  Next, the names of the files on which the coordinates are written can be changed. CSV_FILENAME is the name of the already existing CSV file giving the program the coordinates of the stars to observe for that particular night, and TXT_FILENAME is the name of the TXT file that will be created within the program. 
   
 ```
-CSV_FILENAME = 'all_coordinates_CSV.csv'
+CSV_FILENAME = 'all_coordinates_' + datetime.now().strftime("%Y_%m_%d") + '.csv'
 TXT_FILENAME = 'all_coordinates_TXT.txt'
 ```
 
-The DELAY constant corresponds to the number of seconds prior to the start time given in the CSV file at which to start the target acqusition. For example, here, the target acquisition will start 5 minutes (300 seconds) before the time at which we want to start recording the stream. Finally, the RADIUS constant corresponds to the radius entered during the astrometry.net search, which is the radius from the given coordinates for it to look for known recognizable stars. 
+The DELAY constant corresponds to the number of seconds prior to the start time given in the CSV file at which to start the target acqusition. For example, here, the target acquisition will start 5 minutes (300 seconds) before the time at which we want to start recording the stream. The RADIUS constant corresponds to the radius entered during the astrometry.net search, which is the radius from the given coordinates for it to look for known recognizable stars. 
+The TIMEOUT constant will intervene when waiting for the camera to finish the acqusition: if it takes longer than TIMEOUT, it will be supposed that there is a problem with the connection of the camera. 
+RA_PARK and DEC_PARK are respectively the right ascension and declination that we might want to set the park position to. 
+MAGNITUDE0 and EXPOSURE0 are the reference for exposure: for a star of magnitude MAGNITUDE0, the exposure of the camera will be set to EXPOSURE0. With those two constants, equivalent exposures are calculated in the MagnitudeToExposure function for other magnitudes. 
+Finally, the MAX_HUMIDITY constant is the limit percentage of humidity in the air that is acceptable for the telescope and camera to be exposed to. 
 
 ```
 DELAY = 300 # number of seconds to start-time to start calibrating
 RADIUS = 10 # radius given to astrometry.net search
+TIMEOUT = 60 # number of seconds until camera is considered not working
+
+RA_PARK = 179
+DEC_PARK = 1
+MAGNITUDE0 = 9
+EXPOSURE0 = 0.05 # an exposure of EXPOSURE0 for a star of magnitude MAGNITUDE0 will set the equivalent for other magnitudes
+MAX_HUMIDITY = 0.95
 ```
 
-# II/ The main function
+# II/ The main() function
 
   The main function is the function that will trigger the pictures and streams of a chosen star at a chosen time. It takes in argument a CSV file containing information on stars to captured and when and how to capture them (see [example](https://github.com/jdescloitres/stellar-occult/blob/main/all_coordinates_CSV_example.csv)). This CSV file changes every night. Each line of the file represents a star. To simplify the code, this content of the CSV file is then represented as dictionnaries in a TXT file (see CSV_TO_TXT).
 
@@ -173,7 +188,7 @@ The telescope pointing and the capture of the stream are set to start respective
 
 ```
 s = sched.scheduler(time.time)
-s.enterabs(star['start'] - DELAY, 1, CalibrateTelescope, kwargs = (star))
+s.enterabs(star['epoch'] - star['duration']/2 - DELAY, 1, CalibrateTelescope, kwargs = (star))
 s.run()
 ```
 
@@ -190,7 +205,7 @@ The pointing itself is divided into three (or four) parts (see Figure):
  The first step to calibrating the telescope is making sure the star we are directing it to is in fact visible at this time of night. To do so, we are using the astroplan library, and giving it the scope's coordinates on Earth, the coordinates of the target (star), and the time.
  
 ```
-star_coord = SkyCoord(ra = star['ra']*u.deg, dec = star['dec']*u.deg)
+star_coord = SkyCoord(ra = star['ra']*u.hourangle, dec = star['dec']*u.deg)
 target = FixedTarget(coord = star_coord)
 time = Time(datetime.now())
 h = OCA.altaz(time, target).alt		# h is the current altitude of the star
@@ -205,12 +220,12 @@ if "Field center: (RA,Dec)" in output :
 	coordinates_str = output.split("Field center: (RA,Dec) = (",1)[1]
 	coordinates_cpl = coordinates_str.split(")")[0]
 	alpha0 = float(coordinates_cpl.split(", ")[0]) * 24.0/360.0
-	delta0 = float(coordinates_cpl.split(", ")[1]) * 24.0/360.0
+	delta0 = float(coordinates_cpl.split(", ")[1])
 	logging.info('Stars recognized, coordinates found are (' + str(alpha0) + ', ' + str(delta0) + ')')
 else :
 	print("Stars are not recognizable - ignoring calibration")
 	alpha0 = star['ra']
-	delta0 = star['dec']*24.0/360.0
+	delta0 = star['dec']
 ```
 
   If the difference - between the coordinates given to the telescope and the actual ones returned by astrometry.net - is small enough, the telescope pointing is considered to be correct. 
@@ -246,16 +261,16 @@ print('Telescope parked')
 
 
 # III/ Details for secondary functions
- ## 1. EnterNewCoordinates
+ ## 1. EnterNewCoordinates()
 	
   This function gives the telescope new equatorial coordinates to track, and waits for it to be locked on its new position (by interrogating the state of the property and waiting until it is not BUSY anymore).
 	
- ## 2. CapturePictures
+ ## 2. CapturePictures()
 	
   This function takes in argument a star and a list of exposures to capture the star with. For every given exposure, the program will wait for the previous picture to have been captured before taking a new one, while the first one is being processed and saved to a fits file, the name of which contains information on the star itself and the time of the capture. All pictures are saved into a folder named with the current date. 
 The function returns a list of the names of the paths. The use of this function in the main function is restricted to one exposure each time it is called, and the path returned is used for astrometry.net.
 	
- ## 3. MagnitudeToExposure
+ ## 3. MagnitudeToExposure()
 	
   The aim of this function is to give an equivalent of exposure for magnitude given, in a way that the relation between magnitude and exposure is the same for every star (no matter the magnitude).
   The current form is very simple and may require accurate tuning and a more complex calibration (for example, by adjusting the gain), depending on the telescope that is used. 

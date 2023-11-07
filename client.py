@@ -2,7 +2,7 @@
     Copyright (C) 2023 by Julie Descloitres <julie.descloitres@gmail.com>
     Copyright (C) 2023 by Paolo Tanga <paolo.tanga@oca.eu>
     Laboratoire de la Cote d'Azur
-
+    Version 0.9
 """
 
 
